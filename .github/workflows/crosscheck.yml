@@ -1,0 +1,45 @@
+name: Cross-check conjugations
+
+# Compares every form the engine produces with verbecc, an independent
+# conjugator (LGPL-3.0). verbecc is only installed here as a reference;
+# nothing from it is stored in the repository.
+on:
+  push:
+    branches: [main]
+    paths:
+      - js/conjugate.js
+      - data/verbs.json
+      - scripts/dump-conjugations.js
+      - scripts/crosscheck.py
+      - tests/crosscheck-exceptions.json
+      - .github/workflows/crosscheck.yml
+  pull_request:
+    paths:
+      - js/conjugate.js
+      - data/verbs.json
+      - scripts/dump-conjugations.js
+      - scripts/crosscheck.py
+      - tests/crosscheck-exceptions.json
+      - .github/workflows/crosscheck.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  crosscheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install verbecc
+        run: pip install verbecc==2.1.0
+      - name: Dump our conjugations
+        run: node scripts/dump-conjugations.js > conjugations.json
+      - name: Compare with verbecc
+        run: python scripts/crosscheck.py conjugations.json

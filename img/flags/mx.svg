@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 120" preserveAspectRatio="none">
+  <rect width="70" height="120" fill="#006847"/>
+  <rect x="70" width="70" height="120" fill="#fff"/>
+  <rect x="140" width="70" height="120" fill="#ce1126"/>
+  <!-- simplified coat of arms -->
+  <ellipse cx="105" cy="62" rx="20" ry="18" fill="#8c5a2b"/>
+  <path d="M88 72 q17 14 34 0" fill="none" stroke="#006847" stroke-width="5"/>
+</svg>

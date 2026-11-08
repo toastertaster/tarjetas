@@ -1,0 +1,9 @@
+{
+  "name": "tarjetas",
+  "private": true,
+  "type": "module",
+  "description": "Spanish flash-card quizzes. No dependencies: the site is static and tests use node --test.",
+  "scripts": {
+    "test": "node --test"
+  }
+}
