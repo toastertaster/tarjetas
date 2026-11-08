@@ -2,6 +2,7 @@
 // Region = Both) Mexico ↔ Spain equivalents. Data format: CONTENT.md.
 
 import { LEVELS } from './conjugate.js';
+import { shuffle } from './random.js';
 
 const lvl = (l) => LEVELS.indexOf(l);
 export const OTHER_REGION = { mx: 'es', es: 'mx' };
@@ -112,15 +113,6 @@ export function vocabQuestion({ items, settings, level, mode, rng, avoid, topic 
   else if (mode === 'typed') dir = 'en-es';
   else dir = rng() < 0.5 ? 'es-en' : 'en-es';
   return vocabQuestionFor({ item, dir, region, mode, items, rng });
-}
-
-function shuffle(arr, rng) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }
 
 function vocabOptions(q, items, rng) {

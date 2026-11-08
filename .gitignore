@@ -3,3 +3,4 @@ verbecc.log
 conjugations.json
 _site/
 .DS_Store
+.cache/

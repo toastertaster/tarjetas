@@ -421,6 +421,49 @@ main {
   color: var(--muted);
 }
 
+/* Idioms and conversation lines are longer than one verb */
+.verb.phrase {
+  font-size: clamp(1.5rem, 4.5vw, 2.1rem);
+}
+
+.verb.speech::before {
+  content: '💬 ';
+  font-size: 0.8em;
+}
+
+/* Fill-in-the-blank sentences (grammar and Tatoeba) */
+.sentence {
+  margin: 0.2rem 0 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(1.35rem, 4vw, 1.8rem);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.blank {
+  display: inline-block;
+  min-width: 3.5em;
+  margin: 0 0.15em;
+  border-bottom: 2px solid var(--accent);
+  color: transparent;
+  line-height: 1;
+}
+
+.gloss .inf {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.credit {
+  margin: 0.2rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.credit a {
+  color: inherit;
+}
+
 /* Multiple choice */
 
 .options {
@@ -842,6 +885,14 @@ dialog form button {
 
   .verb {
     font-size: 1.9rem;
+  }
+
+  .verb.phrase {
+    font-size: 1.45rem;
+  }
+
+  .sentence {
+    font-size: 1.3rem;
   }
 }
 

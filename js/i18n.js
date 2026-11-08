@@ -28,8 +28,14 @@ const UI = {
     'scope.vocab': 'Vocabulary: all topics',
     'scope.review': 'My mistakes ({n})',
     'scope.cat': 'Review: {label}',
+    'scope.sentences': 'Verbs in real sentences',
+    'scope.idioms': 'Idioms & expressions',
+    'scope.conversation': 'Conversation: all situations',
+    'scope.grammar': 'Grammar: all topics',
     'group.verbs': 'Verbs',
     'group.vocab': 'Vocabulary topics',
+    'group.phrases': 'Idioms & conversation',
+    'group.grammar': 'Grammar',
     'group.review': 'Review',
     'mood.indicative': 'Indicative',
     'mood.subjunctive': 'Subjunctive',
@@ -67,6 +73,14 @@ const UI = {
     'prompt.vocab.en-es': 'How do you say this in Spanish?',
     'prompt.vocab.en-es-region': 'How do you say this in {region}?',
     'prompt.vocab.regional': 'They say this in {from}. What do they say in {to}?',
+    'prompt.sentence': 'Fill in the blank',
+    'prompt.idiom.es-en': 'What does this expression mean?',
+    'prompt.idiom.en-es': 'Which expression means…',
+    'prompt.conversation': 'What is the best reply?',
+    'prompt.grammar': 'Choose the word that fits',
+    'credit.sentence': 'Sentence {link} by {by}',
+    'credit.translation': 'translation {link} by {by}',
+    'loadSentencesError': 'Could not load the example sentences.',
     rememberArticle: 'Correct! With its article: {answer}',
     settings: 'Settings',
     review: 'Review',
@@ -115,8 +129,14 @@ const UI = {
     'scope.vocab': 'Vocabulario: todos los temas',
     'scope.review': 'Mis errores ({n})',
     'scope.cat': 'Repaso: {label}',
+    'scope.sentences': 'Verbos en frases reales',
+    'scope.idioms': 'Modismos y expresiones',
+    'scope.conversation': 'Conversación: todas las situaciones',
+    'scope.grammar': 'Gramática: todos los temas',
     'group.verbs': 'Verbos',
     'group.vocab': 'Temas de vocabulario',
+    'group.phrases': 'Modismos y conversación',
+    'group.grammar': 'Gramática',
     'group.review': 'Repaso',
     'mood.indicative': 'Indicativo',
     'mood.subjunctive': 'Subjuntivo',
@@ -154,6 +174,14 @@ const UI = {
     'prompt.vocab.en-es': '¿Cómo se dice en español?',
     'prompt.vocab.en-es-region': '¿Cómo se dice en {region}?',
     'prompt.vocab.regional': 'Así se dice en {from}. ¿Y en {to}?',
+    'prompt.sentence': 'Completa la frase',
+    'prompt.idiom.es-en': '¿Qué significa esta expresión?',
+    'prompt.idiom.en-es': '¿Qué expresión significa…?',
+    'prompt.conversation': '¿Cuál es la mejor respuesta?',
+    'prompt.grammar': 'Elige la palabra correcta',
+    'credit.sentence': 'Frase {link} de {by}',
+    'credit.translation': 'traducción {link} de {by}',
+    'loadSentencesError': 'No se pudieron cargar las frases de ejemplo.',
     rememberArticle: '¡Correcto! Con su artículo: {answer}',
     settings: 'Ajustes',
     review: 'Repaso',
@@ -463,6 +491,12 @@ const personName = (lang, n, c) => {
   return (lang === 'en' ? ' for ' : ' de ') + b(personLabel(n.why.tense ?? c.tense, p));
 };
 
+// A Tatoeba sentence with its verb in bold.
+const sentenceHtml = (n) =>
+  `<span lang="es">${esc(n.es.slice(0, n.blank[0]))}<b>${esc(n.es.slice(n.blank[0], n.blank[1]))}</b>${esc(n.es.slice(n.blank[1]))}</span>`;
+// The persons a form can be: "yo or él / ella / usted".
+const personList = (n, or) => n.persons.map((p) => b(personLabel(n.tense, p))).join(or);
+
 // Each note: explain(note, ctx) and hint(note, ctx). Returning null skips it.
 const NOTES = {
   en: {
@@ -574,6 +608,18 @@ const NOTES = {
           : `It starts with “${esc(n.letter)}”.`,
     },
     reveal: { explain: (n) => `It starts like this: ${b(n.text)}` },
+    sentence: { explain: (n) => `${sentenceHtml(n)} — “${esc(n.en)}”` },
+    'sentence-person': { explain: (n) => `Subject: ${personList(n, ' or ')}.` },
+    'idiom-meaning': { explain: (n) => `${b(n.es)} means “${esc(n.en)}”.` },
+    'picked-idiom': { explain: (n) => `You chose: ${b(n.es)} means “${esc(n.en)}”.`, hint: () => null },
+    literal: { explain: (n) => `Literally: “${esc(n.literal)}”.` },
+    example: { explain: (n) => `${b(n.es)} — “${esc(n.en)}”` },
+    'phrase-region': { explain: (n) => `Used mainly in ${REGION_NAMES.en[n.region]}.` },
+    exchange: { explain: (n) => `They say ${b(n.prompt.es)} (“${esc(n.prompt.en)}”). A good reply: ${b(n.answer.es)} (“${esc(n.answer.en)}”).` },
+    'picked-reply': { explain: (n) => `You chose ${b(n.es)} (“${esc(n.en)}”), which doesn't answer what they said.`, hint: () => null },
+    'they-said': { explain: (n) => `They said: “${esc(n.en)}”` },
+    'grammar-why': { explain: (n) => esc(n.why.en), hint: () => null },
+    'grammar-tip': { explain: (n) => esc(n.tip.en) },
   },
   es: {
     'tense-rule': { explain: (n) => TENSE_RULES.es(n.tense, n.cls) },
@@ -684,6 +730,18 @@ const NOTES = {
           : `Empieza por “${esc(n.letter)}”.`,
     },
     reveal: { explain: (n) => `Empieza así: ${b(n.text)}` },
+    sentence: { explain: (n) => `${sentenceHtml(n)} — “${esc(n.en)}”` },
+    'sentence-person': { explain: (n) => `Sujeto: ${personList(n, ' o ')}.` },
+    'idiom-meaning': { explain: (n) => `${b(n.es)} significa “${esc(n.en)}”.` },
+    'picked-idiom': { explain: (n) => `Elegiste: ${b(n.es)} significa “${esc(n.en)}”.`, hint: () => null },
+    literal: { explain: (n) => `Literalmente: “${esc(n.literal)}”.` },
+    example: { explain: (n) => `${b(n.es)} — “${esc(n.en)}”` },
+    'phrase-region': { explain: (n) => `Se usa sobre todo en ${REGION_NAMES.es[n.region]}.` },
+    exchange: { explain: (n) => `Te dicen ${b(n.prompt.es)} (“${esc(n.prompt.en)}”). Una buena respuesta: ${b(n.answer.es)} (“${esc(n.answer.en)}”).` },
+    'picked-reply': { explain: (n) => `Elegiste ${b(n.es)} (“${esc(n.en)}”), que no responde a lo que te dijeron.`, hint: () => null },
+    'they-said': { explain: (n) => `Te dijeron: “${esc(n.en)}”` },
+    'grammar-why': { explain: (n) => esc(n.why.es ?? n.why.en), hint: () => null },
+    'grammar-tip': { explain: (n) => esc(n.tip.es ?? n.tip.en) },
   },
 };
 
@@ -694,8 +752,8 @@ export const regionName = (lang, r) => REGION_NAMES[lang][r];
 
 // ---------------------------------------------------------------------------
 // Review categories (see js/review.js): a label and a short tip each.
-// Tense and topic categories are labeled from the tense names and the
-// vocabulary data instead.
+// Tense, vocabulary topic, conversation situation and grammar set categories
+// are labeled from the tense names and the content data instead.
 
 const CATEGORIES = {
   en: {
@@ -722,6 +780,7 @@ const CATEGORIES = {
     vosotros: ['Vosotros forms', 'Spain uses vosotros for "you all" among friends: -áis/-éis/-ís in the present, -steis in the preterite, -d in commands.'],
     meanings: ['Verb meanings', 'Which Spanish verb means what.'],
     regional: ['Mexico ↔ Spain words', 'Everyday words that differ between Mexico and Spain: carro/coche, computadora/ordenador.'],
+    idioms: ['Idioms & expressions', 'Idioms rarely mean what their words say. Learn each one with its literal image and an example: meter la pata, literally "to put in the paw", means to put your foot in it.'],
   },
   es: {
     'stem:e-ie': ['Cambio de raíz e → ie (pienso, quiero)', 'En las formas tónicas la e de la raíz pasa a ie. Nosotros y vosotros mantienen la e: pensamos.'],
@@ -747,25 +806,36 @@ const CATEGORIES = {
     vosotros: ['Formas de vosotros', 'En España se usa vosotros para "ustedes" en confianza: -áis/-éis/-ís en presente, -steis en pretérito, -d en el imperativo.'],
     meanings: ['Significado de verbos', 'Qué significa cada verbo.'],
     regional: ['Palabras de México ↔ España', 'Palabras cotidianas que cambian entre México y España: carro/coche, computadora/ordenador.'],
+    idioms: ['Modismos y expresiones', 'Los modismos casi nunca significan lo que dicen sus palabras. Apréndelos con su imagen literal y un ejemplo: meter la pata es equivocarse.'],
   },
 };
 
 export const categoryKeys = (lang) => Object.keys(CATEGORIES[lang]);
 
-/** Label for a review category. `topics` are the vocabulary topic names. */
-export function categoryLabel(lang, key, topics = {}) {
+// Category prefix → where its names live in the content (see `names` below).
+const NAMED = { 'topic:': 'topics', 'situation:': 'situations', 'grammar:': 'grammarSets' };
+const namedEntry = (key, names) => {
+  const prefix = Object.keys(NAMED).find((p) => key.startsWith(p));
+  return prefix ? { id: key.slice(prefix.length), entry: names[NAMED[prefix]]?.[key.slice(prefix.length)] } : null;
+};
+const localized = (obj, lang) => obj[lang] ?? obj.en;
+
+/**
+ * Label for a review category. `names` holds the content's names:
+ * { topics, situations, grammarSets }, each id → { en, es }.
+ */
+export function categoryLabel(lang, key, names = {}) {
   if (key.startsWith('tense:')) return tenseLabel(lang, key.slice(6));
-  if (key.startsWith('topic:')) {
-    const topic = topics[key.slice(6)];
-    return topic ? (topic[lang] ?? topic.en) : key.slice(6);
-  }
+  const named = namedEntry(key, names);
+  if (named) return named.entry ? localized(named.entry, lang) : named.id;
   return CATEGORIES[lang][key]?.[0] ?? key;
 }
 
 /** One-line rule for a category, as HTML. */
-export function categoryTipHtml(lang, key) {
+export function categoryTipHtml(lang, key, names = {}) {
   if (key.startsWith('tense:')) return tenseInfoHtml(lang, key.slice(6));
-  if (key.startsWith('topic:')) return '';
+  const named = namedEntry(key, names);
+  if (named) return named.entry?.tip ? esc(localized(named.entry.tip, lang)) : '';
   return esc(CATEGORIES[lang][key]?.[1] ?? '');
 }
 
@@ -775,7 +845,8 @@ export function exampleHtml(lang, ex) {
     const person = ex.person === null ? '' : ` · ${esc(personLabel(ex.tense, ex.person))}`;
     return `<span lang="es">${esc(ex.inf)}</span> · ${esc(tenseName(lang, ex.tense))}${person} → ${b(ex.answer)}`;
   }
-  return `${esc(ex.prompt)} → <b>${esc(ex.answer)}</b>`;
+  const answerLang = ex.kind === 'meaning' || ex.kind === 'idiom' || (ex.kind === 'vocab' && ex.dir === 'es-en') ? 'en' : 'es';
+  return `${esc(ex.prompt)} → <b lang="${answerLang}">${esc(ex.answer)}</b>`;
 }
 
 /** Render one note as HTML (or null to skip it). mode is 'explain' or 'hint'. */
