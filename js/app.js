@@ -5,6 +5,7 @@
 import { TENSES, LEVELS, analyze } from './conjugate.js';
 import { makeQuestion, gradeTyped, scoreFor, subjectOf, NoQuestion, MODES, REGIONS } from './quiz.js';
 import { emptyPhrases } from './phrases.js';
+import { respell } from './pronounce.js';
 import { explanationNotes, hintNotes, noteContext, reveal, optionMeaning } from './explain.js';
 import { needsReview, scopeFor } from './review.js';
 import {
@@ -182,61 +183,81 @@ const answerLang = (q) => q.optionLang ?? (q.direction === 'es-en' || q.dir === 
 
 const tatoebaLink = (id) => `<a href="https://tatoeba.org/en/sentences/show/${encodeURIComponent(id)}" target="_blank" rel="noopener">#${esc(id)}</a>`;
 
-function sentencePromptHtml(q) {
-  const { item } = q;
-  const before = esc(item.es.slice(0, item.blank[0]));
-  const after = esc(item.es.slice(item.blank[1]));
-  const credit = `${T('credit.sentence', { link: tatoebaLink(item.id), by: esc(item.by) })}, ${T('credit.translation', { link: tatoebaLink(item.enId), by: esc(item.enBy) })} · Tatoeba, CC BY 2.0 FR`;
-  return `
-    <p class="instruction">${esc(T('prompt.sentence'))}</p>
-    <p class="sentence" lang="es">${before}<span class="blank">____</span>${after}</p>
-    <p class="gloss"><span lang="es" class="inf">${esc(q.verb.inf)}</span> · ${esc(item.en)}</p>
-    <p class="credit">${credit}</p>`;
+// Every card reads top to bottom: what the card is about (big), what helps
+// to understand it (meaning, pronunciation, translation), then the task in
+// one line, right above the answers.
+
+const subject = (text, textLang, cls = '') => `<p class="verb${cls}" lang="${textLang}">${esc(text)}</p>`;
+const helper = (text, textLang = 'en') => `<p class="gloss" lang="${textLang}">${esc(text)}</p>`;
+const task = (html) => `<p class="task">${html}</p>`;
+const bold = (text, textLang) => `<b${textLang ? ` lang="${textLang}"` : ''}>${esc(text)}</b>`;
+// "preterite (simple past)", to sit mid-sentence in a task
+const tenseInTask = (id) => {
+  const label = tenseLabel(lang(), id);
+  return label[0].toLowerCase() + label.slice(1);
+};
+
+// The pronunciation guide (hablar → ah-BLAHR), with Spain's "th" when practicing Spain's Spanish.
+function say(text, region = progress.settings.region) {
+  return `<p class="say">${esc(T('say'))} <span class="sounds">${esc(respell(text, region))}</span></p>`;
+}
+
+function blanked(text, [start, end]) {
+  return `<p class="sentence" lang="es">${esc(text.slice(0, start))}<span class="blank">____</span>${esc(text.slice(end))}</p>`;
 }
 
 function promptHtml(q) {
-  if (q.kind === 'sentence') return sentencePromptHtml(q);
-  if (q.kind === 'idiom') {
-    const lang = q.dir === 'es-en' ? 'es' : 'en';
-    return `<p class="instruction">${esc(T(`prompt.idiom.${q.dir}`))}</p><p class="verb phrase" lang="${lang}">${esc(q.prompt)}</p>`;
-  }
-  if (q.kind === 'conversation') {
-    return `<p class="instruction">${esc(T('prompt.conversation'))}</p><p class="verb phrase speech" lang="es">${esc(q.prompt)}</p>`;
-  }
-  if (q.kind === 'grammar') {
-    const [before, after] = q.item.es.split('___').map(esc);
-    return `<p class="instruction">${esc(T('prompt.grammar'))}</p>
-      <p class="sentence" lang="es">${before}<span class="blank">____</span>${after}</p>
-      <p class="gloss">${esc(q.item.en)}</p>`;
-  }
-  if (q.kind === 'vocab') {
-    const region = regionName(lang(), q.vocabRegion);
-    if (q.dir === 'es-en') {
-      return `<p class="instruction">${esc(T('prompt.vocab.es-en'))}</p><p class="verb" lang="es">${esc(q.prompt)}</p>`;
+  switch (q.kind) {
+    case 'conj': {
+      const nonfinite = q.person === null;
+      const v = analyze(q.verb);
+      // Non-finite forms are taught without the reflexive pronoun.
+      const inf = nonfinite ? v.base : q.verb.inf;
+      const refl = v.reflexive && !nonfinite ? ` <small>(${esc(T('reflexive'))})</small>` : '';
+      const tense = bold(tenseInTask(q.tense));
+      const todo = nonfinite
+        ? T('task.nonfinite', { tense })
+        : T('task.conj', { person: bold(personLabel(q.tense, q.person), 'es') + refl, tense });
+      return subject(inf, 'es') + helper(q.verb.en) + say(inf) + task(todo);
     }
-    if (q.dir === 'regional') {
-      const from = regionName(lang(), q.vocabRegion === 'mx' ? 'es' : 'mx');
-      return `<p class="instruction">${esc(T('prompt.vocab.regional', { from, to: region }))}</p>
-        <p class="verb" lang="es">${esc(q.prompt)}</p><p class="gloss">${esc(q.item.en)}</p>`;
+    case 'sentence': {
+      const todo = T('task.sentence', { inf: bold(q.verb.inf, 'es'), tense: bold(tenseInTask(q.tense)) });
+      return blanked(q.item.es, q.item.blank) + helper(q.item.en) + task(todo);
     }
-    const instruction = q.region ? T('prompt.vocab.en-es-region', { region }) : T('prompt.vocab.en-es');
-    return `<p class="instruction">${esc(instruction)}</p><p class="verb" lang="en">${esc(q.prompt)}</p>`;
+    case 'meaning':
+      return q.direction === 'es-en'
+        ? subject(q.verb.inf, 'es') + say(q.verb.inf) + task(esc(T('prompt.es-en')))
+        : subject(q.verb.en, 'en') + task(esc(T('prompt.en-es')));
+    case 'vocab': {
+      const region = regionName(lang(), q.vocabRegion);
+      if (q.dir === 'es-en') return subject(q.prompt, 'es') + say(q.prompt, q.vocabRegion) + task(esc(T('prompt.vocab.es-en')));
+      if (q.dir === 'regional') {
+        const fromRegion = q.vocabRegion === 'mx' ? 'es' : 'mx';
+        const ask = T('prompt.vocab.regional', { from: regionName(lang(), fromRegion), to: region });
+        return subject(q.prompt, 'es') + helper(q.item.en) + say(q.prompt, fromRegion) + task(esc(ask));
+      }
+      const ask = q.region ? T('prompt.vocab.en-es-region', { region }) : T('prompt.vocab.en-es');
+      return subject(q.prompt, 'en') + task(esc(ask));
+    }
+    case 'idiom':
+      return q.dir === 'es-en'
+        ? subject(q.prompt, 'es', ' phrase') + say(q.prompt) + task(esc(T('prompt.idiom.es-en')))
+        : subject(q.prompt, 'en', ' phrase') + task(esc(T('prompt.idiom.en-es')));
+    case 'conversation':
+      return subject(q.prompt, 'es', ' phrase speech') + task(esc(T('prompt.conversation')));
+    case 'grammar':
+      return blanked(q.item.es, [q.item.es.indexOf('___'), q.item.es.indexOf('___') + 3]) + helper(q.item.en) + task(esc(T('prompt.grammar')));
   }
-  if (q.kind === 'meaning') {
-    const word = q.direction === 'es-en' ? `<p class="verb" lang="es">${esc(q.verb.inf)}</p>` : `<p class="verb" lang="en">${esc(q.verb.en)}</p>`;
-    return `<p class="instruction">${esc(T(`prompt.${q.direction}`))}</p>${word}`;
-  }
-  const nonfinite = q.person === null;
-  const v = analyze(q.verb);
-  // Non-finite forms are taught without the reflexive pronoun.
-  const inf = nonfinite ? v.base : q.verb.inf;
-  const refl = v.reflexive && !nonfinite ? ` <small>(${esc(T('reflexive'))})</small>` : '';
-  const person = nonfinite ? '' : `<p class="person" lang="es">${esc(personLabel(q.tense, q.person))}${refl}</p>`;
-  return `
-    <p class="instruction">${esc(T('prompt.conj'))}</p>
-    <p class="verb" lang="es">${esc(inf)}</p>
-    <p class="gloss">${esc(q.verb.en)}</p>
-    ${person}`;
+  return '';
+}
+
+// Below the answers: the credit for a Tatoeba sentence.
+function creditHtml(q) {
+  if (q.kind !== 'sentence') return '';
+  const { item } = q;
+  const sentence = T('credit.sentence', { link: tatoebaLink(item.id), by: esc(item.by) });
+  const translation = T('credit.translation', { link: tatoebaLink(item.enId), by: esc(item.enBy) });
+  return `<p class="credit">${sentence}, ${translation} · Tatoeba, CC BY 2.0 FR</p>`;
 }
 
 function answerHtml(q, id) {
@@ -286,9 +307,10 @@ function renderFace(face, q) {
   const info = tensed ? `<p class="tense-info">${tenseInfoHtml(lang(), q.tense)}</p>` : '';
   face.innerHTML = `
     <div class="meta"><span class="chip tense">${chip}</span><span class="chip level">${esc(q.level)}</span>${q.region ? flag(q.region) : ''}</div>
-    ${info}
     ${promptHtml(q)}
+    ${info}
     ${answerHtml(q, state.turn)}
+    ${creditHtml(q)}
     <div class="hint-box" hidden></div>
     <p class="card-note" hidden></p>
     <div class="card-actions">

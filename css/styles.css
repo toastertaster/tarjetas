@@ -389,7 +389,7 @@ main {
 
 /* What the tense means, between the margin line and the prompt */
 .tense-info {
-  margin: 0.55rem 0 0;
+  margin: -0.3rem 0 0; /* sits just under the task it explains */
   font-size: 0.9rem;
   color: var(--muted);
 }
@@ -411,12 +411,6 @@ main {
   border-radius: 1px;
 }
 
-.instruction {
-  margin: 0.4rem 0 0;
-  font-size: 0.9rem;
-  color: var(--muted);
-}
-
 .verb {
   margin: 0;
   font-family: Georgia, 'Times New Roman', serif;
@@ -431,14 +425,30 @@ main {
   color: var(--muted);
 }
 
-.person {
-  margin: 0.25rem 0 0;
-  font-size: 1.3rem;
+/* How to say the word: "Sounds like ah-BLAHR" */
+.say {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.say .sounds {
   font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+/* What to do, right above the answers: "Conjugate it for yo in the preterite" */
+.task {
+  margin: 0.5rem 0 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.task b {
   color: var(--accent);
 }
 
-.person small {
+.task small {
   font-weight: 400;
   color: var(--muted);
 }
@@ -469,11 +479,6 @@ main {
   border-bottom: 2px solid var(--accent);
   color: transparent;
   line-height: 1;
-}
-
-.gloss .inf {
-  font-weight: 700;
-  color: var(--accent);
 }
 
 .credit {

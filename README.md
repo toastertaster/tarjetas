@@ -29,6 +29,13 @@ the settings fold away behind the ⚙ button.
 | `H` (`Alt+H` / `⌥H` while typing) | Hint; press again for more help |
 | `?` | Keyboard help |
 
+Each card reads top to bottom: the Spanish word or sentence in large type,
+then what it means and a **Sounds like** pronunciation guide written in
+English spelling with the stressed syllable in capitals (*tener* → *teh-NEHR*;
+with Region set to Spain, *c* and *z* sound like *th*), then the task in bold
+(*Conjugate it for **yo** in the **preterite***), then the answers. The guide
+is rule-based, so treat it as an approximation.
+
 **Verbs in real sentences** shows a sentence written by a native speaker with
 its verb blanked out, plus the infinitive, the tense and an English
 translation; you work out the person from the sentence. The sentences come
@@ -147,6 +154,7 @@ engine or verb list changes.
 | `js/quiz.js` | Picks questions for each Scope, builds multiple-choice distractors, grades typed answers |
 | `js/vocab.js` | Vocabulary questions, regional variants, article and gender grading |
 | `js/phrases.js` | Idiom, conversation and grammar questions |
+| `js/pronounce.js` | The "Sounds like" guide: respells Spanish in English spelling, stressed syllable in capitals |
 | `js/english.js` | English meanings of verb forms (*tuve — I had*), shown on the options after a miss |
 | `js/random.js` | Seeded randomness and level-weighted picking shared by every kind of question |
 | `js/review.js` | Maps questions to review topics, tracks misses, keeps the mistakes deck |
