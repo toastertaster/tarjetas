@@ -36,10 +36,16 @@ export async function cardReady(page) {
   await page.evaluate(() => document.fonts.ready);
 }
 
-/** Skip the card: shows the answer (and every option's meaning) without scoring. */
+/** Show the answer (and every option's meaning) without scoring the card. */
+export async function showAnswer(page) {
+  await face(page).locator('.answer-btn').click();
+  await expect(page.locator('#feedback')).toBeVisible();
+}
+
+/** Skip straight to the next card. */
 export async function skip(page) {
   await page.keyboard.press('Escape');
-  await expect(page.locator('#feedback')).toBeVisible();
+  await cardReady(page);
 }
 
 export async function next(page) {
@@ -53,7 +59,6 @@ export async function cardWhere(page, test, tries = 40) {
   for (let i = 0; i < tries; i++) {
     if (await test(page)) return;
     await skip(page);
-    await next(page);
   }
   throw new Error('no matching card');
 }

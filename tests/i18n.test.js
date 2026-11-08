@@ -193,6 +193,35 @@ test('vocabulary explanations and hints render for every word, direction and mis
   }
 });
 
+test('Spanish-to-English verb meaning hints show the verb in a real sentence, never the meaning', async () => {
+  const { meaningQuestionFor } = await import('../js/quiz.js');
+  const { exampleFor } = await import('../js/explain.js');
+  const rng = seededRng(21);
+  let withExample = 0;
+  for (const verb of verbs) {
+    const q = meaningQuestionFor({ verb, direction: 'es-en', mode: 'mc', verbs, rng });
+    const example = exampleFor(verb, sentences, 'mx');
+    if (example) {
+      withExample += 1;
+      assert.notEqual(example.region, 'es', `${verb.inf}: a Spain-only sentence for Mexico`);
+    }
+    const hints = hintNotes(q, { example });
+    assert.equal(hints[0].key, example ? 'verb-example' : 'meaning-hint');
+    checkRendered(q, hints, 'hint');
+    checkRendered(q, explanationNotes(q, { example }), 'explain');
+    for (const lang of LANGS) {
+      const text = hints.map((n) => renderNote(lang, n, 'hint', noteContext(q))).join(' ');
+      assert.ok(!text.includes(q.verb.en), `${lang} ${verb.inf} hint gives the meaning away: ${text}`);
+      if (example) assert.ok(text.includes('tatoeba.org'), `${lang} ${verb.inf}: the sentence needs its credit`);
+    }
+  }
+  // most verbs have one (the rest fall back to the first letter)
+  assert.ok(withExample > verbs.length * 0.65, `${withExample} of ${verbs.length}`);
+  // English to Spanish, a sentence would show the verb itself
+  const en = meaningQuestionFor({ verb: verbs[2], direction: 'en-es', mode: 'mc', verbs, rng });
+  assert.equal(hintNotes(en, { example: exampleFor(verbs[2], sentences, 'mx') })[0].key, 'meaning-hint');
+});
+
 test('every review category has a label and a tip in both languages', async () => {
   const { categoryKeys, categoryLabel, categoryTipHtml, exampleHtml } = await import('../js/i18n.js');
   assert.deepEqual(categoryKeys('es').sort(), categoryKeys('en').sort());

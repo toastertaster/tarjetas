@@ -25,7 +25,8 @@ the settings fold away behind the ⚙ button.
 |---|---|
 | `1`–`4` | Pick an answer |
 | `Enter` | Check the answer / go to the next card |
-| `Esc` | Skip (shows the answer) |
+| `Esc` | Skip to the next card (not scored) |
+| `A` (`Alt+A` / `⌥A` while typing) | Show the answer (not scored) |
 | `H` (`Alt+H` / `⌥H` while typing) | Hint; press again for more help |
 | `?` | Keyboard help |
 
@@ -44,7 +45,14 @@ links its authors. **Idioms**, **conversation** (pick the best reply) and
 **grammar** (ser/estar, por/para, preterite/imperfect, subjunctive, gustar)
 are always multiple choice, whatever the Mode.
 
-After a miss (or a skip), every multiple-choice option shows what it means,
+Hints point the way without giving the answer: the rules for the tense, the
+first letter of a word, an idiom's word-for-word meaning. For *What does this
+verb mean?* the hint shows the verb in a short real sentence from Tatoeba
+(*Él **sacó** una foto*), chosen so its translation uses the meaning being
+asked, and the translation comes with the answer. Verbs without one (about a
+quarter, mostly B2–C2) get the first letter of their English meaning instead.
+
+After a miss (or *Show answer*), every multiple-choice option shows what it means,
 so all four can be compared: *tuve — I had*, *tenía — I used to have*,
 *tuvo — he/she had*, and *tení — not a real form*. For vocabulary, idioms and
 conversation the options show their translations.
@@ -56,9 +64,10 @@ nouns the article is optional, but a wrong one (*la carro*) is a gender mistake.
 
 **Auto level** starts at A2 and watches your last 20 answers: 85% or better
 moves you up a level, below 60% moves you down. Answers after a hint count
-half. Skipping a card (`Esc`) shows the answer without counting it: it doesn't
-change your score, streak or level, and isn't recorded as a mistake. Your
-settings and level are saved in the browser.
+half. *Skip* (`Esc`) moves straight to the next card, and *Show answer* (`A`)
+shows the answer and its explanation; neither counts: they don't change your
+score, streak or level, and aren't recorded as mistakes. Your settings and
+level are saved in the browser.
 
 **Review** (📋 in the header) lists the topics you have missed at least twice
 in your last ten tries: a tense, a pattern such as irregular preterite stems or

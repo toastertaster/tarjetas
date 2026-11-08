@@ -6,7 +6,7 @@ import { TENSES, LEVELS, analyze } from './conjugate.js';
 import { makeQuestion, gradeTyped, scoreFor, subjectOf, NoQuestion, MODES, REGIONS } from './quiz.js';
 import { emptyPhrases } from './phrases.js';
 import { respell } from './pronounce.js';
-import { explanationNotes, hintNotes, noteContext, reveal, optionMeaning } from './explain.js';
+import { explanationNotes, hintNotes, noteContext, reveal, optionMeaning, exampleFor } from './explain.js';
 import { needsReview, scopeFor } from './review.js';
 import {
   t,
@@ -20,6 +20,7 @@ import {
   categoryLabel,
   categoryTipHtml,
   exampleHtml,
+  tatoebaCredit,
 } from './i18n.js';
 import { Progress } from './progress.js';
 
@@ -44,7 +45,7 @@ const state = {
   hintLevel: 0,
   turn: 0,
   recent: [],
-  outcome: null, // { kind: 'wrong' | 'skipped', picked?, grade? } while feedback shows
+  outcome: null, // { kind: 'wrong' | 'shown', picked?, grade? } while feedback shows
 };
 
 function safeStorage() {
@@ -181,8 +182,6 @@ function flag(region) {
 // The language of the options and the answer.
 const answerLang = (q) => q.optionLang ?? (q.direction === 'es-en' || q.dir === 'es-en' ? 'en' : 'es');
 
-const tatoebaLink = (id) => `<a href="https://tatoeba.org/en/sentences/show/${encodeURIComponent(id)}" target="_blank" rel="noopener">#${esc(id)}</a>`;
-
 // Every card reads top to bottom: what the card is about (big), what helps
 // to understand it (meaning, pronunciation, translation), then the task in
 // one line, right above the answers.
@@ -252,13 +251,7 @@ function promptHtml(q) {
 }
 
 // Below the answers: the credit for a Tatoeba sentence.
-function creditHtml(q) {
-  if (q.kind !== 'sentence') return '';
-  const { item } = q;
-  const sentence = T('credit.sentence', { link: tatoebaLink(item.id), by: esc(item.by) });
-  const translation = T('credit.translation', { link: tatoebaLink(item.enId), by: esc(item.enBy) });
-  return `<p class="credit">${sentence}, ${translation} · Tatoeba, CC BY 2.0 FR</p>`;
-}
+const creditHtml = (q) => (q.kind === 'sentence' ? `<p class="credit">${tatoebaCredit(lang(), q.item)}</p>` : '');
 
 function answerHtml(q, id) {
   if (q.mode === 'mc') {
@@ -315,6 +308,7 @@ function renderFace(face, q) {
     <p class="card-note" hidden></p>
     <div class="card-actions">
       <button type="button" class="skip-btn" title="Esc">${esc(T('skip'))} <kbd>Esc</kbd></button>
+      <button type="button" class="answer-btn" title="A">${esc(T('showAnswer'))} <kbd>A</kbd></button>
       <button type="button" class="hint-btn" title="H">💡 ${esc(T('hint'))} <kbd>H</kbd></button>
     </div>`;
   face.tabIndex = -1;
@@ -322,6 +316,7 @@ function renderFace(face, q) {
   for (const b of $$('.option', face)) b.addEventListener('click', () => choose(Number(b.dataset.i)));
   $('.hint-btn', face).addEventListener('click', hint);
   $('.skip-btn', face).addEventListener('click', skip);
+  $('.answer-btn', face).addEventListener('click', showAnswer);
   const form = $('.typed', face);
   if (form) {
     const input = $('input[type=text]', form);
@@ -454,9 +449,16 @@ function submitTyped(value) {
   else succeed(grade.result, { grade });
 }
 
+// Skip: straight to the next card, as if this one never came up.
 function skip() {
   if (state.phase !== 'answering') return;
-  fail({ kind: 'skipped' });
+  flipToNext();
+}
+
+// Show answer: the answer and its explanation, without scoring the card.
+function showAnswer() {
+  if (state.phase !== 'answering') return;
+  fail({ kind: 'shown' });
 }
 
 function record(score) {
@@ -495,7 +497,7 @@ function markAnswered(face, outcome = state.outcome) {
   const input = $('input[type=text]', face);
   if (input) {
     input.disabled = true;
-    input.classList.add(outcome ? 'wrong' : 'correct');
+    if (outcome?.kind !== 'shown') input.classList.add(outcome ? 'wrong' : 'correct');
     for (const b of $$('.typed button', face)) b.disabled = true;
   }
   for (const b of $$('.card-actions button', face)) b.disabled = true;
@@ -523,10 +525,12 @@ function fail(outcome) {
   state.outcome = outcome;
   const face = currentFace();
   markAnswered(face, outcome);
-  face.classList.add('is-wrong');
-  // A skip means the card wasn't worth answering: it shows the answer but
-  // isn't scored, doesn't touch the auto level, and isn't a review mistake.
-  if (outcome.kind !== 'skipped') record(0);
+  // Asking for the answer isn't a miss: it isn't scored, doesn't touch the
+  // auto level, and doesn't go into the mistakes deck.
+  if (outcome.kind === 'wrong') {
+    face.classList.add('is-wrong');
+    record(0);
+  }
   renderFeedback();
 }
 
@@ -538,20 +542,29 @@ function fail(outcome) {
 const removable = (q) => Math.min(2, q.options.filter((o) => !o.correct).length - 1);
 const maxHints = (q) => (q.options && removable(q) < 1 ? 1 : 2);
 
-function hint() {
-  if (state.phase !== 'answering' || state.hintLevel >= maxHints(state.q)) return;
+async function hint() {
+  const q = state.q;
+  if (state.phase !== 'answering' || state.hintLevel >= maxHints(q)) return;
   state.hintLevel += 1;
-  if (state.hintLevel === 2 && state.q.options) {
-    const wrong = state.q.options.filter((o) => !o.correct && !o.eliminated);
-    for (let n = removable(state.q); n > 0 && wrong.length; n--) wrong.splice(Math.floor(Math.random() * wrong.length), 1)[0].eliminated = true;
+  if (state.hintLevel === 2 && q.options) {
+    const wrong = q.options.filter((o) => !o.correct && !o.eliminated);
+    for (let n = removable(q); n > 0 && wrong.length; n--) wrong.splice(Math.floor(Math.random() * wrong.length), 1)[0].eliminated = true;
+  }
+  // Verb meaning hints use an example sentence, which may still be loading.
+  if (q.kind === 'meaning' && state.sentences === null) {
+    await loadSentences().catch(() => {});
+    if (state.q !== q || state.phase !== 'answering') return;
   }
   renderHints(currentFace());
 }
 
+// A real sentence using the verb of a meaning question, once the sentences are loaded.
+const exampleOf = (q) => (q.kind === 'meaning' && state.sentences ? exampleFor(q.verb, state.sentences, progress.settings.region) : null);
+
 function renderHints(face) {
   const q = state.q;
   const ctx = noteContext(q);
-  const notes = hintNotes(q);
+  const notes = hintNotes(q, { example: exampleOf(q) });
   if (state.hintLevel >= 2 && !q.options) notes.push({ key: 'reveal', text: reveal(q.answer.form) });
   const items = notes.map((n) => renderNote(lang(), n, 'hint', ctx)).filter(Boolean);
   const box = $('.hint-box', face);
@@ -573,15 +586,16 @@ function renderFeedback() {
   const q = state.q;
   const o = state.outcome;
   const ctx = noteContext(q);
-  const notes = explanationNotes(q, { picked: o.picked, grade: o.grade })
+  const notes = explanationNotes(q, { picked: o.picked, grade: o.grade, example: exampleOf(q) })
     .map((n) => renderNote(lang(), n, 'explain', ctx))
     .filter(Boolean);
   const alts = q.answer.alts.length
     ? `<p class="alts">${esc(T('alsoAccepted', { alts: q.answer.alts.join(', ') }))}</p>`
     : '';
   const panel = $('#feedback');
+  panel.classList.toggle('shown', o.kind === 'shown');
   panel.innerHTML = `
-    <h2>✗ ${esc(T(o.kind === 'skipped' ? 'skipped' : 'wrong'))}</h2>
+    <h2>${esc(o.kind === 'shown' ? T('shown') : `✗ ${T('wrong')}`)}</h2>
     <p class="answer">${T('answerIs', { answer: `<b lang="${answerLang(q)}">${esc(q.answer.form)}</b>` })}</p>
     ${alts}
     <ul>${notes.map((n) => `<li>${n}</li>`).join('')}</ul>
@@ -703,9 +717,11 @@ function onKeyDown(e) {
     return;
   }
   if (e.target.matches?.('select')) return;
-  if (e.altKey && e.code === 'KeyH') {
+  // Alt+H / Alt+A also work while typing, where H and A are letters.
+  if (e.altKey && (e.code === 'KeyH' || e.code === 'KeyA')) {
     e.preventDefault();
-    hint();
+    if (e.code === 'KeyH') hint();
+    else showAnswer();
     return;
   }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -729,6 +745,9 @@ function onKeyDown(e) {
   } else if (e.key === 'h' || e.key === 'H') {
     e.preventDefault();
     hint();
+  } else if (e.key === 'a' || e.key === 'A') {
+    e.preventDefault();
+    showAnswer();
   } else if (e.key === '?') {
     e.preventDefault();
     $('#help').showModal();
@@ -804,10 +823,24 @@ async function loadData() {
   }
 }
 
-const needsSentences = () => {
-  const { scope } = progress.settings;
-  return scope === 'sentences' || (scope === 'review' && progress.review.deck.some((d) => d.spec.kind === 'sentence'));
-};
+// The sentences, fetched once however many cards ask for them.
+let sentencesLoad = null;
+function loadSentences() {
+  sentencesLoad ??= loadPacks('sentences').then(
+    (packs) => (state.sentences = packs.flatMap((p) => p.items)),
+    (err) => {
+      sentencesLoad = null; // let a later card try again
+      throw err;
+    },
+  );
+  return sentencesLoad;
+}
+
+const deckHas = (kind) => progress.settings.scope === 'review' && progress.review.deck.some((d) => d.spec.kind === kind);
+// Sentence cards can't be made without the sentences.
+const needsSentences = () => progress.settings.scope === 'sentences' || deckHas('sentence');
+// Verb meaning cards use them for hints and explanations, so they load in the background.
+const usesSentences = () => progress.settings.scope === 'meanings' || deckHas('meaning');
 
 /**
  * Load what the current scope needs before the next card. Resolves to false
@@ -817,13 +850,15 @@ async function ensureContent() {
   const ticket = ++state.loading;
   if (state.sentences === null && needsSentences()) {
     try {
-      state.sentences = (await loadPacks('sentences')).flatMap((p) => p.items);
+      await loadSentences();
     } catch (err) {
       console.error(err);
       toast(T('loadSentencesError'));
       if (progress.settings.scope === 'sentences') progress.set('scope', 'verbs');
       buildControls();
     }
+  } else if (state.sentences === null && usesSentences()) {
+    loadSentences().catch((err) => console.error(err));
   }
   return ticket === state.loading;
 }
