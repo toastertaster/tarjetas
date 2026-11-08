@@ -1,8 +1,8 @@
 // "What to review": which topics a learner keeps getting wrong.
 //
 // Every question belongs to a few categories: its tense, the patterns its
-// answer exercises (from the conjugation engine's tags), or its vocabulary
-// topic. Results are kept per category, and categories that are missed
+// answer exercises (from the conjugation engine's tags), its vocabulary
+// topic, idioms, its conversation situation or its grammar set. Results are kept per category, and categories that are missed
 // repeatedly are suggested for review. Missed questions also go into a
 // mistakes deck that can be practiced directly.
 
@@ -47,24 +47,49 @@ export function conjCategories(tense, person, form) {
 
 /** Every category a question counts toward. */
 export function categoriesFor(q) {
-  if (q.kind === 'conj') return [`tense:${q.tense}`, ...conjCategories(q.tense, q.person, q.answer)];
-  if (q.kind === 'meaning') return ['meanings'];
+  switch (q.kind) {
+    case 'conj':
+    case 'sentence':
+      return [`tense:${q.tense}`, ...conjCategories(q.tense, q.person, q.answer)];
+    case 'meaning':
+      return ['meanings'];
+    case 'idiom':
+      return ['idioms'];
+    case 'conversation':
+      return [`situation:${q.situation}`];
+    case 'grammar':
+      return [`grammar:${q.set}`];
+  }
   const cats = [`topic:${q.topic}`];
   if (q.dir === 'regional') cats.push('regional');
   return cats;
 }
 
+// Categories that are also Scope settings.
+const SCOPE_PREFIXES = ['tense:', 'topic:', 'situation:', 'grammar:'];
+
 // Which Scope setting practices a category, if any.
 export function scopeFor(category) {
-  if (category.startsWith('tense:') || category.startsWith('topic:') || category === 'meanings') return category;
+  if (SCOPE_PREFIXES.some((p) => category.startsWith(p)) || category === 'meanings' || category === 'idioms') return category;
   if (category === 'regional') return 'vocab';
   return `cat:${category}`;
 }
 
 /** A short record of what was missed, for the review page. */
 export function exampleOf(q) {
-  if (q.kind === 'conj') return { kind: 'conj', inf: q.verb.inf, tense: q.tense, person: q.person, answer: q.answer.form };
-  if (q.kind === 'meaning') return { kind: 'meaning', prompt: q.verb.inf, answer: q.verb.en };
+  switch (q.kind) {
+    case 'conj':
+    case 'sentence':
+      return { kind: 'conj', inf: q.verb.inf, tense: q.tense, person: q.person, answer: q.answer.form };
+    case 'meaning':
+      return { kind: 'meaning', prompt: q.verb.inf, answer: q.verb.en };
+    case 'idiom':
+      return { kind: 'idiom', prompt: q.item.es, answer: q.item.en };
+    case 'conversation':
+      return { kind: 'conversation', prompt: q.prompt, answer: q.answer.form };
+    case 'grammar':
+      return { kind: 'grammar', prompt: q.item.es, answer: q.answer.form };
+  }
   return { kind: 'vocab', prompt: q.prompt, answer: q.answer.form, dir: q.dir, region: q.vocabRegion };
 }
 
@@ -108,6 +133,6 @@ export function needsReview(review) {
     }
   }
   // Patterns before tenses/topics when equally missed: they're more specific.
-  const specific = (k) => (k.startsWith('tense:') || k.startsWith('topic:') ? 0 : 1);
+  const specific = (k) => (SCOPE_PREFIXES.some((p) => k.startsWith(p)) ? 0 : 1);
   return out.sort((a, b) => b.misses - a.misses || specific(b.key) - specific(a.key) || b.missed - a.missed);
 }

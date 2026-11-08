@@ -106,6 +106,59 @@ test('meaning questions explain both the answer and the wrong pick', () => {
 });
 
 const vocab = JSON.parse(readFileSync(new URL('../data/vocab.json', import.meta.url), 'utf8'));
+const readData = (f) => JSON.parse(readFileSync(new URL(`../data/${f}`, import.meta.url), 'utf8'));
+const idioms = readData('idioms.json');
+const conversation = readData('conversation.json');
+const grammar = readData('grammar.json');
+const sentences = readData('sentences.json').items;
+
+function checkRendered(q, notes, mode) {
+  for (const lang of LANGS) {
+    for (const note of notes) {
+      const html = renderNote(lang, note, mode, noteContext(q));
+      if (html === null && mode === 'hint') continue;
+      assert.ok(html && !html.includes('undefined') && !html.includes('[object'), `${lang} ${q.key} ${note.key}: ${html}`);
+    }
+  }
+}
+
+test('idiom, conversation and grammar explanations and hints render for every item', async () => {
+  const { idiomQuestionFor, conversationQuestionFor, grammarQuestionFor } = await import('../js/phrases.js');
+  const rng = seededRng(13);
+  const questions = [
+    ...idioms.items.flatMap((item) => ['es-en', 'en-es'].map((dir) => idiomQuestionFor({ item, dir, idioms: idioms.items, rng }))),
+    ...conversation.items.map((item) => conversationQuestionFor({ item, rng })),
+    ...grammar.items.map((item) => grammarQuestionFor({ item, grammarSets: grammar.sets, rng })),
+  ];
+  for (const q of questions) {
+    const wrong = q.options.find((o) => !o.correct);
+    checkRendered(q, explanationNotes(q, { picked: wrong }), 'explain');
+    const hints = hintNotes(q);
+    checkRendered(q, hints, 'hint');
+    // a hint never contains the answer as a whole word
+    for (const lang of LANGS) {
+      const text = hints.map((n) => renderNote(lang, n, 'hint', noteContext(q))).join(' ').replace(/<[^>]+>/g, '');
+      if (q.kind === 'idiom') assert.ok(!text.toLowerCase().includes(q.answer.form.toLowerCase()), `${lang} ${q.key}: ${text}`);
+    }
+  }
+});
+
+test('sentence explanations and hints render, and hints never show the form', async () => {
+  const { sentenceQuestionFor } = await import('../js/quiz.js');
+  const rng = seededRng(14);
+  for (const item of sentences.filter((_, i) => i % 7 === 0)) {
+    const verb = verbs.find((v) => v.inf === item.inf);
+    const q = sentenceQuestionFor({ item, verb, mode: 'mc', region: 'es', rng });
+    checkRendered(q, explanationNotes(q, { picked: q.options.find((o) => !o.correct) }), 'explain');
+    checkRendered(q, hintNotes(q), 'hint');
+    for (const lang of LANGS) {
+      for (const note of hintNotes(q)) {
+        const html = renderNote(lang, note, 'hint', noteContext(q));
+        if (html && !['tense-rule', 'orth', 'like'].includes(note.key)) assert.ok(!html.includes(`>${q.answer.form}<`), `${lang} hint reveals ${q.answer.form}: ${html}`);
+      }
+    }
+  }
+});
 
 test('vocabulary explanations and hints render for every word, direction and mistake', async () => {
   const { vocabQuestionFor } = await import('../js/vocab.js');
@@ -144,10 +197,16 @@ test('every review category has a label and a tip in both languages', async () =
   const { categoryKeys, categoryLabel, categoryTipHtml, exampleHtml } = await import('../js/i18n.js');
   assert.deepEqual(categoryKeys('es').sort(), categoryKeys('en').sort());
   for (const lang of LANGS) {
-    for (const key of [...categoryKeys('en'), 'tense:pret', 'topic:food']) {
-      assert.ok(categoryLabel(lang, key, vocab.topics), `${lang} ${key}`);
-      assert.notEqual(categoryLabel(lang, key, vocab.topics), key, `${lang} ${key} has no label`);
-      if (!key.startsWith('topic:')) assert.ok(categoryTipHtml(lang, key), `${lang} ${key} has no tip`);
+    const names = { topics: vocab.topics, situations: conversation.situations, grammarSets: grammar.sets };
+    const named = [
+      ...Object.keys(vocab.topics).map((id) => `topic:${id}`),
+      ...Object.keys(conversation.situations).map((id) => `situation:${id}`),
+      ...Object.keys(grammar.sets).map((id) => `grammar:${id}`),
+    ];
+    for (const key of [...categoryKeys('en'), 'tense:pret', ...named]) {
+      const label = categoryLabel(lang, key, names);
+      assert.ok(label && !key.endsWith(`:${label}`) && label !== key, `${lang} ${key} has no label`);
+      if (!key.startsWith('topic:') && !key.startsWith('situation:')) assert.ok(categoryTipHtml(lang, key, names), `${lang} ${key} has no tip`);
     }
     const ex = exampleHtml(lang, { kind: 'conj', inf: 'tener', tense: 'pret', person: 0, answer: 'tuve' });
     assert.ok(ex.includes('tuve') && ex.includes('yo'));

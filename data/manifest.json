@@ -15,6 +15,39 @@
       "title": "Everyday vocabulary",
       "source": "Written for tarjetas",
       "license": "MIT"
+    },
+    {
+      "id": "idioms",
+      "kind": "idioms",
+      "file": "idioms.json",
+      "title": "Idioms & expressions",
+      "source": "Written for tarjetas",
+      "license": "MIT"
+    },
+    {
+      "id": "conversation",
+      "kind": "conversation",
+      "file": "conversation.json",
+      "title": "Conversation",
+      "source": "Written for tarjetas",
+      "license": "MIT"
+    },
+    {
+      "id": "grammar",
+      "kind": "grammar",
+      "file": "grammar.json",
+      "title": "Grammar",
+      "source": "Written for tarjetas",
+      "license": "MIT"
+    },
+    {
+      "id": "sentences",
+      "kind": "sentences",
+      "file": "sentences.json",
+      "title": "Example sentences",
+      "source": "Tatoeba",
+      "license": "CC BY 2.0 FR",
+      "attribution": "https://github.com/toastertaster/tarjetas/blob/main/ATTRIBUTION.md"
     }
   ]
 }
