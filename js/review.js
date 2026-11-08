@@ -53,6 +53,10 @@ export function categoriesFor(q) {
       return [`tense:${q.tense}`, ...conjCategories(q.tense, q.person, q.answer)];
     case 'meaning':
       return ['meanings'];
+    case 'recognize':
+      return ['recognize'];
+    case 'listen':
+      return ['listening'];
     case 'idiom':
       return ['idioms'];
     case 'conversation':
@@ -67,10 +71,11 @@ export function categoriesFor(q) {
 
 // Categories that are also Scope settings.
 const SCOPE_PREFIXES = ['tense:', 'topic:', 'situation:', 'grammar:'];
+const SCOPES = ['meanings', 'idioms', 'recognize', 'listening'];
 
 // Which Scope setting practices a category, if any.
 export function scopeFor(category) {
-  if (SCOPE_PREFIXES.some((p) => category.startsWith(p)) || category === 'meanings' || category === 'idioms') return category;
+  if (SCOPE_PREFIXES.some((p) => category.startsWith(p)) || SCOPES.includes(category)) return category;
   if (category === 'regional') return 'vocab';
   return `cat:${category}`;
 }
@@ -83,6 +88,10 @@ export function exampleOf(q) {
       return { kind: 'conj', inf: q.verb.inf, tense: q.tense, person: q.person, answer: q.answer.form };
     case 'meaning':
       return { kind: 'meaning', prompt: q.verb.inf, answer: q.verb.en };
+    case 'recognize':
+      return { kind: 'recognize', form: q.form, inf: q.verb.inf, tense: q.tense, persons: q.persons };
+    case 'listen':
+      return { kind: 'listen', prompt: q.item.es, answer: q.item.en };
     case 'idiom':
       return { kind: 'idiom', prompt: q.item.es, answer: q.item.en };
     case 'conversation':

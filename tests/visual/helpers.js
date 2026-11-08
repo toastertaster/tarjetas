@@ -7,6 +7,10 @@ export const face = (page) => page.locator('.face:not([inert])');
 /**
  * Open the app with saved settings (and optionally a review history) and a
  * seeded Math.random, so the same cards come up on every run.
+ *
+ * Speech is replaced by a silent stand-in with the same two Spanish voices in
+ * every browser (which voices exist differs by machine); what would have been
+ * read aloud is kept in window.spoken.
  */
 export async function openApp(page, { settings = {}, review = null, seed = 1 } = {}) {
   await page.addInitScript(
@@ -19,6 +23,24 @@ export async function openApp(page, { settings = {}, review = null, seed = 1 } =
         t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
       };
+      const voices = [
+        { name: 'Test (México)', lang: 'es-MX' },
+        { name: 'Test (España)', lang: 'es-ES' },
+      ];
+      window.spoken = [];
+      window.SpeechSynthesisUtterance = class {
+        constructor(text) {
+          this.text = text;
+        }
+      };
+      Object.defineProperty(window, 'speechSynthesis', {
+        configurable: true,
+        value: {
+          getVoices: () => voices,
+          speak: (u) => window.spoken.push({ text: u.text, lang: u.lang, rate: u.rate }),
+          cancel: () => {},
+        },
+      });
       // Only before the first load, so reloads keep what the test did.
       if (!sessionStorage.getItem('tarjetas.test')) {
         sessionStorage.setItem('tarjetas.test', '1');

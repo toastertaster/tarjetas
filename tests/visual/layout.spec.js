@@ -79,7 +79,10 @@ const STATES = [
   ['a conversation card', { scope: 'conversation' }],
   ['a grammar card', { scope: 'grammar' }],
   ['a sentence card', { scope: 'sentences' }],
+  ['a recognize card', { scope: 'recognize' }],
+  ['a listening card', { scope: 'listening' }],
   ['a typed answer', { scope: 'verbs', mode: 'typed' }],
+  ['a conjugation in Spain, with vosotros in its table', { scope: 'tense:pres', region: 'es' }],
 ];
 
 for (const [name, settings, want] of STATES) {
@@ -141,9 +144,38 @@ test('a verb meaning hint shows the verb in a real sentence', async ({ page }) =
   await expectNoOverflow(page, 'with a meaning hint');
 });
 
+test('a missed conjugation shows its whole tense, the answer highlighted', async ({ page }) => {
+  await openApp(page, { settings: { scope: 'tense:pret', region: 'mx' } });
+  await showAnswer(page);
+  const table = page.locator('#feedback .conj-table');
+  // no vosotros in Mexico
+  await expect(table.locator('.cell:not(.empty) .who')).toHaveText(['yo', 'tú', 'él / ella / usted', 'nosotros', 'ellos / ellas / ustedes']);
+  const answer = await page.locator('#feedback .answer b').innerText();
+  await expect(table.locator('.cell.hl b')).toHaveText([answer]);
+});
+
+test('S reads the card aloud in the accent of the region, and a listening card plays by itself', async ({ page }) => {
+  await openApp(page, { settings: { scope: 'meanings', region: 'es' } });
+  await cardWhere(page, async (p) => (await face(p).locator('.verb[lang=es]').count()) > 0);
+  const word = await face(page).locator('.verb').innerText();
+  await page.keyboard.press('s');
+  expect(await page.evaluate(() => window.spoken)).toEqual([{ text: word, lang: 'es-ES', rate: 0.9 }]);
+  // once the page has been used, the next listening card starts on its own
+  await choose(page, '#scope', 'listening');
+  await skip(page);
+  const sentence = await face(page).locator('.listen-box .speak-btn').first().getAttribute('data-say');
+  await expect.poll(() => page.evaluate(() => window.spoken.at(-1))).toEqual({ text: sentence, lang: 'es-ES', rate: 0.9 });
+  await face(page).locator('.listen-box .speak-btn[data-slow]').click();
+  expect(await page.evaluate(() => window.spoken.at(-1).rate)).toBe(0.6);
+  // the sentence isn't written on the card until the hint
+  await expect(face(page)).not.toContainText(sentence);
+  await page.keyboard.press('h');
+  await expect(face(page).locator('.hint-box')).toContainText(sentence);
+});
+
 test('switching scopes keeps the page within the screen', async ({ page }) => {
   await openApp(page);
-  for (const scope of ['meanings', 'topic:food', 'situation:restaurant', 'grammar:por-para', 'tense:subj_impf']) {
+  for (const scope of ['meanings', 'topic:food', 'situation:restaurant', 'grammar:por-para', 'tense:subj_impf', 'recognize', 'listening']) {
     await choose(page, '#scope', scope);
     await expectNoOverflow(page, `with scope ${scope}`);
   }

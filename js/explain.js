@@ -27,7 +27,7 @@ function tagNotes(q) {
 export function noteContext(q) {
   if (!q.verb) return { form: q.answer.form };
   const ctx = { inf: q.verb.inf, form: q.answer.form, tense: q.tense, person: q.person };
-  if (q.kind === 'conj' || q.kind === 'sentence') {
+  if (q.kind === 'conj' || q.kind === 'sentence' || q.kind === 'recognize') {
     ctx.cls = analyze(q.verb).cls;
     ctx.pp = tables(q.verb).table.participle[0].form;
   }
@@ -44,15 +44,19 @@ const stems = (text) =>
     .filter((w) => w.length > 1 && !GLOSS_FILLER.has(w))
     .map((w) => w.slice(0, 4));
 
+// Sentences a learner of the region should see: no other country's speakers,
+// no vosotros for Mexico.
+const suits = (s, region) => (!s.region || region === 'both' || s.region === region) && !(region === 'mx' && s.persons?.includes(VOSOTROS));
+
 /**
- * A real sentence that uses the verb, to work out what it means from context,
- * or null. Of the Tatoeba sentences for the verb that suit the region, the
- * best is one whose translation uses the verb's meaning (not an idiom like
- * "te eché de menos" for echar), and then one of about five words: enough
+ * The sentence that best shows what a word means, from candidates that
+ * contain it ({ ...sentence, blank: where the word is }). The best is one
+ * whose translation uses the meaning being taught (not an idiom like "te
+ * eché de menos" for echar), and then one of about five words: enough
  * context, little else to read.
  */
-export function exampleFor(verb, sentences, region) {
-  const meaning = new Set(stems(verb.en));
+function bestExample(candidates, gloss) {
+  const meaning = new Set(stems(gloss));
   const rank = (s) => [
     stems(s.en).some((w) => meaning.has(w)) ? 0 : 1,
     Math.abs(s.es.split(' ').length - 5),
@@ -61,8 +65,7 @@ export function exampleFor(verb, sentences, region) {
   ];
   let best = null;
   let bestRank = null;
-  for (const s of sentences) {
-    if (s.inf !== verb.inf || (s.region && region !== 'both' && s.region !== region)) continue;
+  for (const s of candidates) {
     const r = rank(s);
     const i = bestRank ? r.findIndex((x, k) => x !== bestRank[k]) : 0;
     if (!bestRank || (i >= 0 && r[i] < bestRank[i])) [best, bestRank] = [s, r];
@@ -70,16 +73,48 @@ export function exampleFor(verb, sentences, region) {
   return best;
 }
 
-const exampleNote = (s) => ({ key: 'verb-example', es: s.es, blank: s.blank, en: s.en, id: s.id, by: s.by, enId: s.enId, enBy: s.enBy });
+/** A real sentence that uses the verb, to work out what it means from context, or null. */
+export function exampleFor(verb, sentences, region) {
+  return bestExample(
+    sentences.filter((s) => s.inf === verb.inf && suits(s, region)),
+    verb.en,
+  );
+}
+
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * A real sentence that uses a vocabulary word (singular or plural, with any
+ * article), with `blank` marking the word, or null.
+ */
+export function wordExampleFor(item, form, sentences, region) {
+  const { core } = splitArticle(form);
+  const word = new RegExp(`(?<!\\p{L})${escapeRegExp(core)}(?:es|s)?(?!\\p{L})`, 'iu');
+  const found = [];
+  for (const s of sentences) {
+    if (!suits(s, region)) continue;
+    const m = word.exec(s.es);
+    if (m) found.push({ ...s, blank: [m.index, m.index + m[0].length] });
+  }
+  return bestExample(found, item.en);
+}
+
+const exampleNote = (s) => ({ key: 'in-sentence', es: s.es, blank: s.blank, en: s.en, id: s.id, by: s.by, enId: s.enId, enBy: s.enBy });
+
+// "tener · nosotros · preterite", as data the templates can label in either language.
+const readingNote = (r) => ({ inf: r.inf, tense: r.tense, persons: r.persons });
 
 /**
  * Notes for the feedback panel.
  *   picked  – the wrong multiple-choice option, if any
  *   grade   – the result of gradeTyped, if the answer was typed
- *   example – a sentence using the verb (exampleFor), for meaning questions
+ *   example – a sentence using the verb or word (exampleFor, wordExampleFor),
+ *             for meaning and vocabulary questions
  */
 export function explanationNotes(q, { picked = null, grade = null, example = null } = {}) {
-  if (q.kind === 'vocab') return vocabNotes(q, { picked, grade });
+  if (q.kind === 'vocab') return [...vocabNotes(q, { picked, grade }), ...(example ? [exampleNote(example)] : [])];
+  if (q.kind === 'listen') return listenNotes(q, picked);
+  if (q.kind === 'recognize') return recognizeNotes(q, picked);
   if (q.kind === 'idiom') return idiomNotes(q, picked);
   if (q.kind === 'conversation') return conversationNotes(q, picked);
   if (q.kind === 'grammar') return grammarNotes(q);
@@ -113,6 +148,22 @@ function vocabNotes(q, { picked, grade }) {
   notes.push({ key: 'vocab-meaning', es: formsFor(item, region).form, en: item.en });
   if (isRegional(item)) notes.push({ key: 'vocab-regions', mx: formsFor(item, 'mx').form, es: formsFor(item, 'es').form });
   if (item.note) notes.push({ key: 'note', note: item.note });
+  return notes;
+}
+
+function recognizeNotes(q, picked) {
+  const notes = [];
+  if (picked?.why?.kind === 'reading') notes.push({ key: 'picked-reading', ...readingNote(picked.why.reading), form: picked.why.reading.form });
+  notes.push({ key: 'reading', form: q.form, ...readingNote(q.reading), en: q.verb.en, english: englishForm(q.verb, q.tense, q.persons[0]) });
+  notes.push(...tenseRule(q), ...tagNotes(q));
+  if (q.persons.includes(VOSOTROS)) notes.push({ key: 'vosotros' });
+  return notes;
+}
+
+function listenNotes(q, picked) {
+  const notes = [];
+  if (picked?.why?.kind === 'listen') notes.push({ key: 'picked-listen', es: picked.why.item.es, en: picked.why.item.en });
+  notes.push(exampleNote(q.item));
   return notes;
 }
 
@@ -175,6 +226,11 @@ export function optionMeaning(q, o) {
     }
     case 'conversation':
       return { text: o.correct ? q.item.answer.en : why.en, lang: 'en' };
+    // the right reading in English (we had), a wrong one by the form it stands for (tenemos)
+    case 'recognize':
+      return o.correct ? { text: englishForm(q.verb, q.tense, q.persons[0]), lang: 'en' } : { text: o.reading.form, lang: 'es' };
+    case 'listen':
+      return { text: o.correct ? q.item.es : why.item.es, lang: 'es' };
   }
   return null;
 }
@@ -182,10 +238,12 @@ export function optionMeaning(q, o) {
 const firstLetter = (s) => s.replace(/^[¡¿]/, '')[0];
 
 // First hint: the rules that apply, without giving the form away.
-//   example – a sentence using the verb (exampleFor), for meaning questions
+//   example – a sentence using the verb or word (exampleFor, wordExampleFor),
+//             for meaning and vocabulary questions
 export function hintNotes(q, { example = null } = {}) {
   if (q.kind === 'vocab') {
-    if (q.dir === 'es-en') return [{ key: 'meaning-hint', letter: firstLetter(q.item.en) }];
+    // Spanish to English, as for verb meanings: the word in a real sentence.
+    if (q.dir === 'es-en') return [example ? exampleNote(example) : { key: 'meaning-hint', letter: firstLetter(q.item.en), english: true }];
     const { core } = splitArticle(q.answer.form);
     return [{ key: 'vocab-hint', letter: firstLetter(core), gender: genderOf(q.item, q.answer.form) }];
   }
@@ -206,6 +264,10 @@ export function hintNotes(q, { example = null } = {}) {
     return [{ key: 'meaning-hint', letter: words.length > 1 ? words[0] : firstLetter(q.item.es) }];
   }
   if (q.kind === 'conversation') return [{ key: 'they-said', en: q.item.prompt.en }];
+  // Which verb it is; the person and tense are left to work out.
+  if (q.kind === 'recognize') return [{ key: 'recognize-hint', inf: q.verb.inf, en: q.verb.en }];
+  // What was said, in writing.
+  if (q.kind === 'listen') return [{ key: 'transcript', es: q.item.es }];
   if (q.kind === 'grammar') return [{ key: 'grammar-tip', tip: q.tip }];
   if (q.kind === 'sentence') return [{ key: 'sentence-person', tense: q.tense, persons: q.persons }, ...tenseRule(q), ...tagNotes(q)];
   return [...tenseRule(q), ...tagNotes(q)];
