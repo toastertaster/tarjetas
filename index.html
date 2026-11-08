@@ -10,26 +10,35 @@
     <script type="module" src="js/app.js"></script>
   </head>
   <body>
-    <header class="topbar">
+    <!-- On narrow screens the settings collapse behind the ⚙ button. -->
+    <header class="topbar" id="topbar">
       <h1 class="brand">Tarjetas</h1>
-      <div class="controls">
-        <label><span data-i18n="mode">Mode</span><select id="mode"></select></label>
-        <label><span data-i18n="scope">Scope</span><select id="scope"></select></label>
-        <label><span data-i18n="level">Level</span><select id="level"></select></label>
-        <label><span data-i18n="region">Region</span><select id="region"></select></label>
-      </div>
-      <div class="status">
-        <span class="score" id="score" aria-live="polite"></span>
+      <button type="button" class="icon-btn settings-toggle" id="settings-toggle" aria-expanded="false" aria-controls="settings" data-i18n-title="settings" title="Settings">⚙︎</button>
+      <div class="settings" id="settings">
+        <div class="controls">
+          <label><span data-i18n="mode">Mode</span><select id="mode"></select></label>
+          <label><span data-i18n="scope">Scope</span><select id="scope"></select></label>
+          <label><span data-i18n="level">Level</span><select id="level"></select></label>
+          <label><span data-i18n="region">Region</span><select id="region"></select></label>
+        </div>
         <div class="lang" role="group" aria-label="Language / Idioma">
           <button type="button" data-lang="en" title="English"><img src="img/flags/us.svg" alt="English" width="28" height="18" /></button>
           <button type="button" data-lang="es" title="Español"><img src="img/flags/mx.svg" alt="Español" width="28" height="18" /></button>
         </div>
-        <button type="button" class="help-btn" id="help-btn" data-i18n-title="help" title="Keyboard shortcuts">?</button>
+      </div>
+      <div class="status">
+        <span class="score" id="score" aria-live="polite"></span>
+        <button type="button" class="review-btn" id="review-btn">
+          <span aria-hidden="true">📋</span> <span class="label" data-i18n="review">Review</span>
+          <span class="count" id="review-count" hidden></span>
+        </button>
+        <button type="button" class="icon-btn" id="help-btn" data-i18n-title="help" title="Keyboard shortcuts">?</button>
       </div>
     </header>
 
     <main>
-      <div class="card-stage">
+      <section class="review-view" id="review-view" hidden aria-labelledby="review-title"></section>
+      <div class="card-stage" id="card-stage">
         <div class="card" id="card">
           <section class="face" data-face="0"><p class="loading" data-i18n="loading">Loading…</p></section>
           <section class="face back" data-face="1" inert></section>

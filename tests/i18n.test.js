@@ -97,11 +97,60 @@ test('every kind of wrong pick is explained', () => {
 });
 
 test('meaning questions explain both the answer and the wrong pick', () => {
-  const q = makeQuestion({ verbs, settings: { mode: 'meaning', scope: 'verbs', region: 'both' }, level: 'B1', rng: seededRng(2) });
+  const q = makeQuestion({ verbs, settings: { mode: 'mc', scope: 'meanings', region: 'both' }, level: 'B1', rng: seededRng(2) });
   const wrong = q.options.find((o) => !o.correct);
   for (const lang of LANGS) {
     const html = explanationNotes(q, { picked: wrong }).map((n) => renderNote(lang, n, 'explain', noteContext(q)));
     assert.ok(html.length >= 2 && html.every(Boolean));
+  }
+});
+
+const vocab = JSON.parse(readFileSync(new URL('../data/vocab.json', import.meta.url), 'utf8'));
+
+test('vocabulary explanations and hints render for every word, direction and mistake', async () => {
+  const { vocabQuestionFor } = await import('../js/vocab.js');
+  const { gradeTyped } = await import('../js/quiz.js');
+  const rng = seededRng(4);
+  for (const item of vocab.items) {
+    for (const dir of ['es-en', 'en-es', 'regional']) {
+      if (dir === 'regional' && typeof item.es !== 'object') continue;
+      const q = vocabQuestionFor({ item, dir, region: 'es', mode: 'mc', items: vocab.items, rng });
+      const typed = vocabQuestionFor({ item, dir: dir === 'es-en' ? 'en-es' : dir, region: 'es', mode: 'typed', items: vocab.items, rng });
+      const wrongGender = gradeTyped(typed, `la ${q.answer.form.replace(/^(el|la|los|las) /, '')}`);
+      const otherRegion = typeof item.es === 'object' ? gradeTyped(typed, item.es.mx) : null;
+      for (const lang of LANGS) {
+        const ctx = noteContext(q);
+        const notes = [
+          ...explanationNotes(q, { picked: q.options.find((o) => !o.correct) }),
+          ...explanationNotes(typed, { grade: wrongGender }),
+          ...(otherRegion ? explanationNotes(typed, { grade: otherRegion }) : []),
+        ];
+        for (const note of notes) {
+          const html = renderNote(lang, note, 'explain', ctx);
+          assert.ok(html && !html.includes('undefined'), `${lang} ${item.id} ${note.key}: ${html}`);
+        }
+        for (const note of hintNotes(q)) {
+          const html = renderNote(lang, note, 'hint', ctx);
+          assert.ok(html && !html.includes('undefined'), `${lang} ${item.id} hint: ${html}`);
+          const text = ` ${html.replace(/<[^>]+>/g, ' ').toLowerCase()} `.replace(/[^a-záéíóúüñ]+/g, ' ');
+          assert.ok(!text.includes(` ${q.answer.form.toLowerCase()} `), `${lang} hint gives away ${q.answer.form}: ${html}`);
+        }
+      }
+    }
+  }
+});
+
+test('every review category has a label and a tip in both languages', async () => {
+  const { categoryKeys, categoryLabel, categoryTipHtml, exampleHtml } = await import('../js/i18n.js');
+  assert.deepEqual(categoryKeys('es').sort(), categoryKeys('en').sort());
+  for (const lang of LANGS) {
+    for (const key of [...categoryKeys('en'), 'tense:pret', 'topic:food']) {
+      assert.ok(categoryLabel(lang, key, vocab.topics), `${lang} ${key}`);
+      assert.notEqual(categoryLabel(lang, key, vocab.topics), key, `${lang} ${key} has no label`);
+      if (!key.startsWith('topic:')) assert.ok(categoryTipHtml(lang, key), `${lang} ${key} has no tip`);
+    }
+    const ex = exampleHtml(lang, { kind: 'conj', inf: 'tener', tense: 'pret', person: 0, answer: 'tuve' });
+    assert.ok(ex.includes('tuve') && ex.includes('yo'));
   }
 });
 

@@ -22,9 +22,15 @@ const UI = {
     region: 'Region',
     'mode.mc': 'Multiple choice',
     'mode.typed': 'Type the answer',
-    'mode.meaning': 'Verb meanings',
     'mode.mixed': 'Mixed',
     'scope.verbs': 'Verbs: all tenses',
+    'scope.meanings': 'Verb meanings',
+    'scope.vocab': 'Vocabulary: all topics',
+    'scope.review': 'My mistakes ({n})',
+    'scope.cat': 'Review: {label}',
+    'group.verbs': 'Verbs',
+    'group.vocab': 'Vocabulary topics',
+    'group.review': 'Review',
     'mood.indicative': 'Indicative',
     'mood.subjunctive': 'Subjunctive',
     'mood.imperative': 'Imperative',
@@ -57,6 +63,26 @@ const UI = {
     'prompt.conj': 'Conjugate',
     'prompt.es-en': 'What does this verb mean?',
     'prompt.en-es': 'Which Spanish verb means…',
+    'prompt.vocab.es-en': 'What does this mean?',
+    'prompt.vocab.en-es': 'How do you say this in Spanish?',
+    'prompt.vocab.en-es-region': 'How do you say this in {region}?',
+    'prompt.vocab.regional': 'They say this in {from}. What do they say in {to}?',
+    rememberArticle: 'Correct! With its article: {answer}',
+    settings: 'Settings',
+    review: 'Review',
+    scoreAria: '{correct} of {answered} correct, streak {streak}',
+    'review.title': 'What to review',
+    'review.intro': 'Topics you have missed more than once recently. Each one comes with the rule and the examples you got wrong.',
+    'review.empty': 'Nothing to review yet. Topics you miss repeatedly will show up here.',
+    'review.missed': 'Missed {misses} of your last {attempts}',
+    'review.examples': 'You missed',
+    'review.practice': 'Practice this',
+    'review.practiceDeck': 'Practice my mistakes ({n})',
+    'review.deckHint': 'Cards you got wrong come back until you answer them right twice in a row.',
+    'review.back': 'Back to the cards',
+    'review.reset': 'Clear review history',
+    'review.resetConfirm': 'Clear your review history and mistakes deck?',
+    'review.deckEmpty': 'No mistakes left to practice. Well done!',
     reflexive: 'reflexive',
     'badge.mx': 'Mexico',
     'badge.es': 'Spain',
@@ -83,9 +109,15 @@ const UI = {
     region: 'Región',
     'mode.mc': 'Opción múltiple',
     'mode.typed': 'Escribir la respuesta',
-    'mode.meaning': 'Significado de verbos',
     'mode.mixed': 'Mixto',
     'scope.verbs': 'Verbos: todos los tiempos',
+    'scope.meanings': 'Significado de verbos',
+    'scope.vocab': 'Vocabulario: todos los temas',
+    'scope.review': 'Mis errores ({n})',
+    'scope.cat': 'Repaso: {label}',
+    'group.verbs': 'Verbos',
+    'group.vocab': 'Temas de vocabulario',
+    'group.review': 'Repaso',
     'mood.indicative': 'Indicativo',
     'mood.subjunctive': 'Subjuntivo',
     'mood.imperative': 'Imperativo',
@@ -118,6 +150,26 @@ const UI = {
     'prompt.conj': 'Conjuga',
     'prompt.es-en': '¿Qué significa este verbo?',
     'prompt.en-es': '¿Qué verbo significa…?',
+    'prompt.vocab.es-en': '¿Qué significa?',
+    'prompt.vocab.en-es': '¿Cómo se dice en español?',
+    'prompt.vocab.en-es-region': '¿Cómo se dice en {region}?',
+    'prompt.vocab.regional': 'Así se dice en {from}. ¿Y en {to}?',
+    rememberArticle: '¡Correcto! Con su artículo: {answer}',
+    settings: 'Ajustes',
+    review: 'Repaso',
+    scoreAria: '{correct} de {answered} correctas, racha {streak}',
+    'review.title': 'Qué repasar',
+    'review.intro': 'Temas que has fallado más de una vez últimamente, con la regla y los ejemplos que fallaste.',
+    'review.empty': 'Todavía no hay nada que repasar. Aquí aparecerán los temas que falles varias veces.',
+    'review.missed': 'Fallaste {misses} de tus últimos {attempts}',
+    'review.examples': 'Fallaste',
+    'review.practice': 'Practicar esto',
+    'review.practiceDeck': 'Practicar mis errores ({n})',
+    'review.deckHint': 'Las tarjetas que fallas vuelven hasta que las aciertas dos veces seguidas.',
+    'review.back': 'Volver a las tarjetas',
+    'review.reset': 'Borrar el historial de repaso',
+    'review.resetConfirm': '¿Borrar tu historial de repaso y tus errores?',
+    'review.deckEmpty': 'No quedan errores por practicar. ¡Bien hecho!',
     reflexive: 'reflexivo',
     'badge.mx': 'México',
     'badge.es': 'España',
@@ -478,7 +530,7 @@ const NOTES = {
           : `Reflexive verb: put the pronoun ${b(n.pronoun)} before the verb.`,
     },
     vosotros: { explain: () => 'Vosotros is used only in Spain. In Mexico and the rest of Latin America, ustedes is used for any group.' },
-    'verb-note': { explain: (n) => esc(n.note.en), hint: () => null },
+    note: { explain: (n) => esc(n.note.en), hint: () => null },
     picked: {
       explain: (n, c) => {
         const f = b(n.form);
@@ -504,6 +556,23 @@ const NOTES = {
     meaning: { explain: (n) => `${b(n.inf)} means “${esc(n.en)}”.` },
     'picked-meaning': { explain: (n) => `You chose: ${b(n.inf)} means “${esc(n.en)}”.`, hint: () => null },
     'meaning-hint': { explain: (n) => `It starts with “${esc(n.letter)}”.` },
+    'vocab-meaning': { explain: (n) => `${b(n.es)} means “${esc(n.en)}”.` },
+    'vocab-regions': { explain: (n) => `Mexico: ${b(n.mx)} · Spain: ${b(n.es)}` },
+    'picked-vocab': { explain: (n) => `You chose: ${b(n.es)} means “${esc(n.en)}”.`, hint: () => null },
+    'vocab-gender': {
+      explain: (n) => `Watch the gender: it's ${b(n.expected)} (${n.gender === 'f' ? 'feminine' : 'masculine'}).`,
+      hint: () => null,
+    },
+    'vocab-other-region': {
+      explain: (n) => `${b(n.form)} is what they say in ${REGION_NAMES.en[n.region]}; in ${REGION_NAMES.en[n.asked]} it's ${b(n.expected)}.`,
+      hint: () => null,
+    },
+    'vocab-hint': {
+      explain: (n) =>
+        n.gender
+          ? `A ${n.gender === 'f' ? 'feminine' : 'masculine'} noun starting with “${esc(n.letter)}”.`
+          : `It starts with “${esc(n.letter)}”.`,
+    },
     reveal: { explain: (n) => `It starts like this: ${b(n.text)}` },
   },
   es: {
@@ -571,7 +640,7 @@ const NOTES = {
           : `Verbo reflexivo: pon el pronombre ${b(n.pronoun)} delante del verbo.`,
     },
     vosotros: { explain: () => 'Vosotros solo se usa en España. En México y el resto de Latinoamérica se usa ustedes para cualquier grupo.' },
-    'verb-note': { explain: (n) => esc(n.note.es ?? n.note.en), hint: () => null },
+    note: { explain: (n) => esc(n.note.es ?? n.note.en), hint: () => null },
     picked: {
       explain: (n, c) => {
         const f = b(n.form);
@@ -597,11 +666,117 @@ const NOTES = {
     meaning: { explain: (n) => `${b(n.inf)} significa “${esc(n.en)}”.` },
     'picked-meaning': { explain: (n) => `Elegiste: ${b(n.inf)} significa “${esc(n.en)}”.`, hint: () => null },
     'meaning-hint': { explain: (n) => `Empieza por “${esc(n.letter)}”.` },
+    'vocab-meaning': { explain: (n) => `${b(n.es)} significa “${esc(n.en)}”.` },
+    'vocab-regions': { explain: (n) => `México: ${b(n.mx)} · España: ${b(n.es)}` },
+    'picked-vocab': { explain: (n) => `Elegiste: ${b(n.es)} significa “${esc(n.en)}”.`, hint: () => null },
+    'vocab-gender': {
+      explain: (n) => `Ojo con el género: es ${b(n.expected)} (${n.gender === 'f' ? 'femenino' : 'masculino'}).`,
+      hint: () => null,
+    },
+    'vocab-other-region': {
+      explain: (n) => `${b(n.form)} es como se dice en ${REGION_NAMES.es[n.region]}; en ${REGION_NAMES.es[n.asked]} se dice ${b(n.expected)}.`,
+      hint: () => null,
+    },
+    'vocab-hint': {
+      explain: (n) =>
+        n.gender
+          ? `Un sustantivo ${n.gender === 'f' ? 'femenino' : 'masculino'} que empieza por “${esc(n.letter)}”.`
+          : `Empieza por “${esc(n.letter)}”.`,
+    },
     reveal: { explain: (n) => `Empieza así: ${b(n.text)}` },
   },
 };
 
 export const noteKeys = (lang) => Object.keys(NOTES[lang]);
+
+const REGION_NAMES = { en: { mx: 'Mexico', es: 'Spain' }, es: { mx: 'México', es: 'España' } };
+export const regionName = (lang, r) => REGION_NAMES[lang][r];
+
+// ---------------------------------------------------------------------------
+// Review categories (see js/review.js): a label and a short tip each.
+// Tense and topic categories are labeled from the tense names and the
+// vocabulary data instead.
+
+const CATEGORIES = {
+  en: {
+    'stem:e-ie': ['Stem change e → ie (pienso, quiero)', 'In stressed forms the e of the stem becomes ie. Nosotros and vosotros keep the e: pensamos.'],
+    'stem:o-ue': ['Stem change o → ue (puedo, vuelvo)', 'In stressed forms the o of the stem becomes ue. Nosotros and vosotros keep the o: podemos.'],
+    'stem:u-ue': ['Stem change u → ue (juego)', 'Only jugar: the stressed u becomes ue (juego, juegas), but jugamos.'],
+    'stem:i-ie': ['Stem change i → ie (adquiero)', 'adquirir and inquirir: the stressed i becomes ie.'],
+    'stem:e-i': ['Stem change e → i (pido, sigo)', 'In stressed forms of these -ir verbs the e becomes i, and it also does in the preterite él/ellos and the gerund: pidió, pidiendo.'],
+    'stem:e-ie-i': ['Stem change e → ie / i (siento, sintió)', 'Stressed forms use ie (siento); the preterite él/ellos, gerund and nosotros/vosotros subjunctive use i (sintió, sintiendo, sintamos).'],
+    'stem:o-ue-u': ['Stem change o → ue / u (duermo, durmió)', 'Stressed forms use ue (duermo); the preterite él/ellos, gerund and nosotros/vosotros subjunctive use u (durmió, durmiendo, durmamos).'],
+    'stem-weak': ['-ir stem changes outside the present', 'Stem-changing -ir verbs also change e → i and o → u in the preterite él/ellos, the gerund, and the nosotros/vosotros subjunctive.'],
+    'yo-irregular': ['Irregular yo forms (tengo, hago, salgo)', 'Many common verbs have an irregular yo form in the present, and the whole present subjunctive is built on it: tengo → tenga.'],
+    zc: ['-zc verbs (conozco, ofrezca)', 'Verbs ending in a vowel + -cer/-cir add z before the c in the yo form and the present subjunctive: conozco, conozca.'],
+    'pret-strong': ['Irregular preterite stems (tuve, hice, dije)', 'These verbs use a new stem in the preterite with unaccented endings -e, -iste, -o, -imos, -isteis, -ieron: tener → tuv-, hacer → hic-, decir → dij- (dijeron).'],
+    'fut-stem': ['Irregular future stems (tendré, haré, podré)', 'A dozen verbs shorten or change their stem in the future and conditional: tendr-, pondr-, saldr-, har-, dir-, podr-, querr-, sabr-, cabr-, habr-.'],
+    'pp-irregular': ['Irregular past participles (hecho, escrito, vuelto)', 'Common irregular participles: abierto, dicho, escrito, hecho, muerto, puesto, roto, visto, vuelto; compounds follow them (devuelto, descrito).'],
+    'imp-tu-irregular': ['Short tú commands (pon, ten, haz, di)', 'Eight verbs have a short affirmative tú command: di, haz, ve, pon, sal, sé, ten, ven. Compounds add an accent: mantén, compón.'],
+    orth: ['Spelling changes (busqué, pagué, empecé, cojo)', 'The spelling changes to keep the sound: c → qu and g → gu before e, z → c before e, g → j and gu → g before a/o.'],
+    accents: ['Written accents (envío, leíste, hui)', 'Stressed í/ú next to another vowel need an accent (envío, reúno, leíste); one-syllable forms take none (hui, rio, guio).'],
+    'y-insertion': ['i → y between vowels (leyó, construyo)', 'An unstressed i between vowels is written y (leyó, cayendo), and -uir verbs add y: construyo, construya.'],
+    reflexive: ['Reflexive pronouns (me levanto)', 'Reflexive verbs need the pronoun that matches the person: me, te, se, nos, os, se.'],
+    'reflexive-commands': ['Pronouns in commands (levántate, vámonos)', 'In affirmative commands the pronoun attaches to the end and an accent keeps the stress (levántate); nosotros drops -s (levantémonos), vosotros drops -d (levantaos).'],
+    irregular: ['Fully irregular forms (ser, ir, haber, dar)', 'Some forms follow no pattern and have to be memorized: soy, fui, voy, he, doy, sé.'],
+    vosotros: ['Vosotros forms', 'Spain uses vosotros for "you all" among friends: -áis/-éis/-ís in the present, -steis in the preterite, -d in commands.'],
+    meanings: ['Verb meanings', 'Which Spanish verb means what.'],
+    regional: ['Mexico ↔ Spain words', 'Everyday words that differ between Mexico and Spain: carro/coche, computadora/ordenador.'],
+  },
+  es: {
+    'stem:e-ie': ['Cambio de raíz e → ie (pienso, quiero)', 'En las formas tónicas la e de la raíz pasa a ie. Nosotros y vosotros mantienen la e: pensamos.'],
+    'stem:o-ue': ['Cambio de raíz o → ue (puedo, vuelvo)', 'En las formas tónicas la o de la raíz pasa a ue. Nosotros y vosotros mantienen la o: podemos.'],
+    'stem:u-ue': ['Cambio de raíz u → ue (juego)', 'Solo jugar: la u tónica pasa a ue (juego, juegas), pero jugamos.'],
+    'stem:i-ie': ['Cambio de raíz i → ie (adquiero)', 'adquirir e inquirir: la i tónica pasa a ie.'],
+    'stem:e-i': ['Cambio de raíz e → i (pido, sigo)', 'En las formas tónicas de estos verbos en -ir la e pasa a i, y también en él/ellos del pretérito y el gerundio: pidió, pidiendo.'],
+    'stem:e-ie-i': ['Cambio de raíz e → ie / i (siento, sintió)', 'Las formas tónicas llevan ie (siento); él/ellos del pretérito, el gerundio y nosotros/vosotros del subjuntivo llevan i (sintió, sintiendo, sintamos).'],
+    'stem:o-ue-u': ['Cambio de raíz o → ue / u (duermo, durmió)', 'Las formas tónicas llevan ue (duermo); él/ellos del pretérito, el gerundio y nosotros/vosotros del subjuntivo llevan u (durmió, durmiendo, durmamos).'],
+    'stem-weak': ['Cambios de raíz en -ir fuera del presente', 'Los verbos en -ir con cambio de raíz también cambian e → i y o → u en él/ellos del pretérito, el gerundio y nosotros/vosotros del subjuntivo.'],
+    'yo-irregular': ['Formas de yo irregulares (tengo, hago, salgo)', 'Muchos verbos comunes tienen la forma de yo del presente irregular, y todo el presente de subjuntivo se forma a partir de ella: tengo → tenga.'],
+    zc: ['Verbos en -zc (conozco, ofrezca)', 'Los verbos en vocal + -cer/-cir añaden z antes de la c en yo y en el presente de subjuntivo: conozco, conozca.'],
+    'pret-strong': ['Raíces irregulares del pretérito (tuve, hice, dije)', 'Estos verbos usan otra raíz en el pretérito con terminaciones sin tilde -e, -iste, -o, -imos, -isteis, -ieron: tener → tuv-, hacer → hic-, decir → dij- (dijeron).'],
+    'fut-stem': ['Raíces irregulares del futuro (tendré, haré, podré)', 'Una docena de verbos acortan o cambian la raíz en el futuro y el condicional: tendr-, pondr-, saldr-, har-, dir-, podr-, querr-, sabr-, cabr-, habr-.'],
+    'pp-irregular': ['Participios irregulares (hecho, escrito, vuelto)', 'Participios irregulares comunes: abierto, dicho, escrito, hecho, muerto, puesto, roto, visto, vuelto; los compuestos los siguen (devuelto, descrito).'],
+    'imp-tu-irregular': ['Imperativos cortos de tú (pon, ten, haz, di)', 'Ocho verbos tienen un imperativo afirmativo de tú corto: di, haz, ve, pon, sal, sé, ten, ven. Los compuestos llevan tilde: mantén, compón.'],
+    orth: ['Cambios ortográficos (busqué, pagué, empecé, cojo)', 'La ortografía cambia para mantener el sonido: c → qu y g → gu delante de e, z → c delante de e, g → j y gu → g delante de a/o.'],
+    accents: ['Tildes (envío, leíste, hui)', 'La í/ú tónica junto a otra vocal lleva tilde (envío, reúno, leíste); las formas de una sílaba no llevan (hui, rio, guio).'],
+    'y-insertion': ['i → y entre vocales (leyó, construyo)', 'Una i átona entre vocales se escribe y (leyó, cayendo), y los verbos en -uir añaden y: construyo, construya.'],
+    reflexive: ['Pronombres reflexivos (me levanto)', 'Los verbos reflexivos llevan el pronombre de su persona: me, te, se, nos, os, se.'],
+    'reflexive-commands': ['Pronombres en el imperativo (levántate, vámonos)', 'En el imperativo afirmativo el pronombre va al final con tilde para mantener el acento (levántate); nosotros pierde la -s (levantémonos) y vosotros la -d (levantaos).'],
+    irregular: ['Formas totalmente irregulares (ser, ir, haber, dar)', 'Algunas formas no siguen ningún patrón y hay que memorizarlas: soy, fui, voy, he, doy, sé.'],
+    vosotros: ['Formas de vosotros', 'En España se usa vosotros para "ustedes" en confianza: -áis/-éis/-ís en presente, -steis en pretérito, -d en el imperativo.'],
+    meanings: ['Significado de verbos', 'Qué significa cada verbo.'],
+    regional: ['Palabras de México ↔ España', 'Palabras cotidianas que cambian entre México y España: carro/coche, computadora/ordenador.'],
+  },
+};
+
+export const categoryKeys = (lang) => Object.keys(CATEGORIES[lang]);
+
+/** Label for a review category. `topics` are the vocabulary topic names. */
+export function categoryLabel(lang, key, topics = {}) {
+  if (key.startsWith('tense:')) return tenseLabel(lang, key.slice(6));
+  if (key.startsWith('topic:')) {
+    const topic = topics[key.slice(6)];
+    return topic ? (topic[lang] ?? topic.en) : key.slice(6);
+  }
+  return CATEGORIES[lang][key]?.[0] ?? key;
+}
+
+/** One-line rule for a category, as HTML. */
+export function categoryTipHtml(lang, key) {
+  if (key.startsWith('tense:')) return tenseInfoHtml(lang, key.slice(6));
+  if (key.startsWith('topic:')) return '';
+  return esc(CATEGORIES[lang][key]?.[1] ?? '');
+}
+
+/** One missed example on the review page, as HTML. */
+export function exampleHtml(lang, ex) {
+  if (ex.kind === 'conj') {
+    const person = ex.person === null ? '' : ` · ${esc(personLabel(ex.tense, ex.person))}`;
+    return `<span lang="es">${esc(ex.inf)}</span> · ${esc(tenseName(lang, ex.tense))}${person} → ${b(ex.answer)}`;
+  }
+  return `${esc(ex.prompt)} → <b>${esc(ex.answer)}</b>`;
+}
 
 /** Render one note as HTML (or null to skip it). mode is 'explain' or 'hint'. */
 export function renderNote(lang, note, mode, ctx) {

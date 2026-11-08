@@ -1,10 +1,24 @@
-// Page controller: settings bar, the flipping card, keyboard handling and the
-// feedback panel. All quiz logic lives in quiz.js / explain.js.
+// Page controller: settings bar, the flipping card, keyboard handling, the
+// feedback panel and the review page. All quiz logic lives in quiz.js,
+// vocab.js, explain.js and review.js.
 
 import { TENSES, LEVELS, analyze } from './conjugate.js';
-import { makeQuestion, gradeTyped, scoreFor, MODES, REGIONS } from './quiz.js';
+import { makeQuestion, gradeTyped, scoreFor, subjectOf, NoQuestion, MODES, REGIONS } from './quiz.js';
 import { explanationNotes, hintNotes, noteContext, reveal } from './explain.js';
-import { t, tenseLabel, tenseInfoHtml, personLabel, renderNote, esc, LANGS } from './i18n.js';
+import { needsReview, scopeFor } from './review.js';
+import {
+  t,
+  tenseLabel,
+  tenseInfoHtml,
+  personLabel,
+  renderNote,
+  esc,
+  LANGS,
+  regionName,
+  categoryLabel,
+  categoryTipHtml,
+  exampleHtml,
+} from './i18n.js';
 import { Progress } from './progress.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -18,6 +32,7 @@ const ACCENT_DELAY = 1700; // longer, so the accent reminder can be read
 
 const state = {
   verbs: [],
+  vocab: { topics: {}, items: [] },
   packs: [],
   q: null,
   phase: 'loading', // answering | transition | feedback
@@ -55,16 +70,35 @@ function buildControls() {
   $('#mode').replaceChildren(...MODES.map((m) => option(m, T(`mode.${m}`), s.mode)));
 
   const scope = $('#scope');
-  scope.replaceChildren(option('verbs', T('scope.verbs'), s.scope));
+  const group = (label, options) => {
+    const g = document.createElement('optgroup');
+    g.label = label;
+    g.append(...options);
+    return g;
+  };
+  scope.replaceChildren(
+    group(T('group.verbs'), [option('verbs', T('scope.verbs'), s.scope), option('meanings', T('scope.meanings'), s.scope)]),
+  );
   for (const mood of ['indicative', 'subjunctive', 'imperative', 'nonfinite']) {
-    const group = document.createElement('optgroup');
-    group.label = T(`mood.${mood}`);
-    for (const tense of TENSES.filter((x) => x.mood === mood)) {
-      group.append(option(`tense:${tense.id}`, `${tenseLabel(lang(), tense.id)} · ${tense.level}`, s.scope));
-    }
-    scope.append(group);
+    const tenses = TENSES.filter((x) => x.mood === mood);
+    scope.append(group(T(`mood.${mood}`), tenses.map((x) => option(`tense:${x.id}`, `${tenseLabel(lang(), x.id)} · ${x.level}`, s.scope))));
   }
-  scope.disabled = s.mode === 'meaning';
+  const topics = Object.entries(state.vocab.topics);
+  if (topics.length) {
+    scope.append(
+      group(T('group.vocab'), [
+        option('vocab', T('scope.vocab'), s.scope),
+        ...topics.map(([id, name]) => option(`topic:${id}`, name[lang()] ?? name.en, s.scope)),
+      ]),
+    );
+  }
+  const deck = progress.review.deck.length;
+  const review = [option('review', T('scope.review', { n: deck }), s.scope)];
+  review[0].disabled = deck === 0 && s.scope !== 'review';
+  if (s.scope.startsWith('cat:')) {
+    review.push(option(s.scope, T('scope.cat', { label: categoryLabel(lang(), s.scope.slice(4)) }), s.scope));
+  }
+  scope.append(group(T('group.review'), review));
 
   $('#level').replaceChildren(
     option('auto', T('level.autoAt', { level: progress.auto.level }), s.level),
@@ -85,7 +119,18 @@ function applyStaticText() {
 
 function renderScore() {
   const s = progress.session;
-  $('#score').textContent = `${T('score', s)} · ${T('streak', s)}`;
+  const el = $('#score');
+  el.textContent = `✓ ${s.correct}/${s.answered} · 🔥 ${s.streak}`;
+  el.setAttribute('aria-label', T('scoreAria', s));
+  el.title = `${T('score', s)} · ${T('streak', s)}`;
+  renderReviewCount();
+}
+
+function renderReviewCount() {
+  const n = needsReview(progress.review).length;
+  const count = $('#review-count');
+  count.textContent = String(n);
+  count.hidden = n === 0;
 }
 
 function renderFooter() {
@@ -102,6 +147,19 @@ function flag(region) {
 }
 
 function promptHtml(q) {
+  if (q.kind === 'vocab') {
+    const region = regionName(lang(), q.vocabRegion);
+    if (q.dir === 'es-en') {
+      return `<p class="instruction">${esc(T('prompt.vocab.es-en'))}</p><p class="verb" lang="es">${esc(q.prompt)}</p>`;
+    }
+    if (q.dir === 'regional') {
+      const from = regionName(lang(), q.vocabRegion === 'mx' ? 'es' : 'mx');
+      return `<p class="instruction">${esc(T('prompt.vocab.regional', { from, to: region }))}</p>
+        <p class="verb" lang="es">${esc(q.prompt)}</p><p class="gloss">${esc(q.item.en)}</p>`;
+    }
+    const instruction = q.region ? T('prompt.vocab.en-es-region', { region }) : T('prompt.vocab.en-es');
+    return `<p class="instruction">${esc(instruction)}</p><p class="verb" lang="en">${esc(q.prompt)}</p>`;
+  }
   if (q.kind === 'meaning') {
     const word = q.direction === 'es-en' ? `<p class="verb" lang="es">${esc(q.verb.inf)}</p>` : `<p class="verb" lang="en">${esc(q.verb.en)}</p>`;
     return `<p class="instruction">${esc(T(`prompt.${q.direction}`))}</p>${word}`;
@@ -121,7 +179,7 @@ function promptHtml(q) {
 
 function answerHtml(q, id) {
   if (q.mode === 'mc') {
-    const textLang = q.kind === 'meaning' && q.direction === 'es-en' ? 'en' : 'es';
+    const textLang = q.direction === 'es-en' || q.dir === 'es-en' ? 'en' : 'es';
     const items = q.options
       .map(
         (o, i) => `<li><button type="button" class="option" data-i="${i}">
@@ -143,7 +201,8 @@ function answerHtml(q, id) {
 
 function renderFace(face, q) {
   const conj = q.kind === 'conj';
-  const chip = esc(conj ? tenseLabel(lang(), q.tense) : T('mode.meaning'));
+  const topic = q.kind === 'vocab' ? state.vocab.topics[q.topic] : null;
+  const chip = esc(conj ? tenseLabel(lang(), q.tense) : topic ? (topic[lang()] ?? topic.en) : T('scope.meanings'));
   const info = conj ? `<p class="tense-info">${tenseInfoHtml(lang(), q.tense)}</p>` : '';
   face.innerHTML = `
     <div class="meta"><span class="chip tense">${chip}</span><span class="chip level">${esc(q.level)}</span>${q.region ? flag(q.region) : ''}</div>
@@ -211,8 +270,27 @@ function insertAtCaret(input, text) {
 // Moving between cards
 
 function newQuestion() {
-  const q = makeQuestion({ verbs: state.verbs, settings: progress.settings, level: progress.level, recent: state.recent });
-  state.recent = [q.verb.inf, ...state.recent].slice(0, 15);
+  const ask = () =>
+    makeQuestion({
+      verbs: state.verbs,
+      vocab: state.vocab,
+      settings: progress.settings,
+      level: progress.level,
+      recent: state.recent,
+      deck: progress.review.deck,
+    });
+  let q;
+  try {
+    q = ask();
+  } catch (err) {
+    if (!(err instanceof NoQuestion)) throw err;
+    // e.g. the mistakes deck is empty: go back to all verbs
+    if (err.reason === 'review-empty') toast(T('review.deckEmpty'));
+    progress.set('scope', 'verbs');
+    buildControls();
+    q = ask();
+  }
+  state.recent = [subjectOf(q), ...state.recent].slice(0, 15);
   return q;
 }
 
@@ -278,12 +356,12 @@ function skip() {
 }
 
 function record(score) {
-  const change = progress.record(score);
+  const deckBefore = progress.review.deck.length;
+  const change = progress.record(score, state.q);
   renderScore();
-  if (change) {
-    buildControls();
-    toast(T(change === 'up' ? 'levelUp' : 'levelDown', { level: progress.auto.level }));
-  }
+  // the Scope list shows the mistakes count and the Auto list the level
+  if (change || progress.review.deck.length !== deckBefore) buildControls();
+  if (change) toast(T(change === 'up' ? 'levelUp' : 'levelDown', { level: progress.auto.level }));
 }
 
 // Show the result on the card: highlight options, lock the inputs.
@@ -315,13 +393,16 @@ function succeed(result, outcome) {
   const face = currentFace();
   markAnswered(face, null);
   face.classList.add('is-correct');
-  if (result === 'accent') {
+  // A reminder that needs reading time: a missing accent, or a noun typed
+  // without its article.
+  const expected = outcome.grade?.expected;
+  if (expected) {
     const note = $('.card-note', face);
-    note.textContent = T('accent', { answer: outcome.grade.expected });
+    note.textContent = T(result === 'accent' ? 'accent' : 'rememberArticle', { answer: expected });
     note.hidden = false;
   }
   record(scoreFor(result, state.hintLevel > 0));
-  setTimeout(flipToNext, result === 'accent' ? ACCENT_DELAY : FLIP_DELAY);
+  setTimeout(flipToNext, expected ? ACCENT_DELAY : FLIP_DELAY);
 }
 
 function fail(outcome) {
@@ -343,7 +424,7 @@ function hint() {
   if (state.hintLevel === 2 && state.q.options) {
     // Second hint in multiple choice: remove two wrong options.
     const wrong = state.q.options.filter((o) => !o.correct && !o.eliminated);
-    for (const o of wrong.sort(() => Math.random() - 0.5).slice(0, 2)) o.eliminated = true;
+    for (let n = 0; n < 2 && wrong.length; n++) wrong.splice(Math.floor(Math.random() * wrong.length), 1)[0].eliminated = true;
   }
   renderHints(currentFace());
 }
@@ -382,7 +463,7 @@ function renderFeedback() {
   const panel = $('#feedback');
   panel.innerHTML = `
     <h2>✗ ${esc(T(o.kind === 'skipped' ? 'skipped' : 'wrong'))}</h2>
-    <p class="answer">${T('answerIs', { answer: `<b lang="${q.kind === 'meaning' && q.direction === 'es-en' ? 'en' : 'es'}">${esc(q.answer.form)}</b>` })}</p>
+    <p class="answer">${T('answerIs', { answer: `<b lang="${q.direction === 'es-en' || q.dir === 'es-en' ? 'en' : 'es'}">${esc(q.answer.form)}</b>` })}</p>
     ${alts}
     <ul>${notes.map((n) => `<li>${n}</li>`).join('')}</ul>
     <footer><span>${esc(T('continue'))}</span><button type="button" class="next-btn">${esc(T('next'))} ↵</button></footer>`;
@@ -408,10 +489,99 @@ function toast(text) {
 }
 
 // ---------------------------------------------------------------------------
+// The review page (#review)
+
+const reviewOpen = () => !$('#review-view').hidden;
+
+function renderReview() {
+  const view = $('#review-view');
+  const items = needsReview(progress.review);
+  const deck = progress.review.deck.length;
+  const list = items
+    .map((c) => {
+      const tip = categoryTipHtml(lang(), c.key);
+      const examples = c.examples.map((ex) => `<li>${exampleHtml(lang(), ex)}</li>`).join('');
+      return `
+        <li class="review-item">
+          <h3>${esc(categoryLabel(lang(), c.key, state.vocab.topics))}</h3>
+          <p class="review-stat">${esc(T('review.missed', { misses: c.misses, attempts: c.attempts }))}</p>
+          ${tip ? `<p class="review-tip">${tip}</p>` : ''}
+          <p class="review-examples-label">${esc(T('review.examples'))}:</p>
+          <ul class="review-examples">${examples}</ul>
+          <button type="button" class="practice-btn" data-category="${esc(c.key)}">${esc(T('review.practice'))}</button>
+        </li>`;
+    })
+    .join('');
+  view.innerHTML = `
+    <header class="review-head">
+      <h2 id="review-title" tabindex="-1">${esc(T('review.title'))}</h2>
+      <button type="button" class="back-btn">← ${esc(T('review.back'))}</button>
+    </header>
+    <p class="review-intro">${esc(T(items.length ? 'review.intro' : 'review.empty'))}</p>
+    <div class="deck-box">
+      <button type="button" class="next-btn deck-btn" ${deck ? '' : 'disabled'}>${esc(T('review.practiceDeck', { n: deck }))}</button>
+      <span>${esc(T('review.deckHint'))}</span>
+    </div>
+    <ol class="review-list">${list}</ol>
+    <p><button type="button" class="link-btn reset-btn">${esc(T('review.reset'))}</button></p>`;
+  $('.back-btn', view).addEventListener('click', closeReview);
+  $('.deck-btn', view).addEventListener('click', () => practice('review'));
+  for (const b of $$('.practice-btn', view)) b.addEventListener('click', () => practiceCategory(b.dataset.category));
+  $('.reset-btn', view).addEventListener('click', () => {
+    if (!window.confirm(T('review.resetConfirm'))) return;
+    progress.resetReview();
+    renderScore();
+    buildControls();
+    renderReview();
+  });
+}
+
+function showReview(open) {
+  $('#review-view').hidden = !open;
+  $('#card-stage').hidden = open;
+  if (open) {
+    $('#feedback').hidden = true;
+    renderReview();
+    $('#review-title').focus?.();
+  } else if (state.q) {
+    $('#feedback').hidden = state.phase !== 'feedback';
+    focusAnswer(currentFace());
+  }
+}
+
+function openReview() {
+  if (location.hash !== '#review') location.hash = 'review';
+  else showReview(true);
+}
+
+function closeReview() {
+  if (location.hash === '#review') history.back();
+  else showReview(false);
+}
+
+function practice(scope, region = null) {
+  progress.set('scope', scope);
+  if (region) progress.set('region', region);
+  buildControls();
+  closeReview();
+  flipToNext();
+}
+
+function practiceCategory(category) {
+  // Mexico ↔ Spain words only come up with Region = Both; vosotros needs Spain's forms.
+  const region = category === 'regional' ? 'both' : category === 'vosotros' && progress.settings.region === 'mx' ? 'es' : null;
+  practice(scopeFor(category), region);
+}
+
+// ---------------------------------------------------------------------------
 // Events
 
 function onKeyDown(e) {
   if ($('#help').open) return;
+  if (reviewOpen()) {
+    if (e.key === 'Escape') closeReview();
+    return;
+  }
   if (e.target.matches?.('select')) return;
   if (e.altKey && e.code === 'KeyH') {
     e.preventDefault();
@@ -469,15 +639,26 @@ function bindEvents() {
     });
   }
   $('#help-btn').addEventListener('click', () => $('#help').showModal());
+  $('#review-btn').addEventListener('click', () => (reviewOpen() ? closeReview() : openReview()));
+  window.addEventListener('hashchange', () => showReview(location.hash === '#review'));
+  // Narrow screens: the settings start collapsed behind the ⚙ button.
+  $('#settings-toggle').addEventListener('click', () => {
+    const open = $('#topbar').classList.toggle('open');
+    $('#settings-toggle').setAttribute('aria-expanded', String(open));
+  });
 }
 
 async function loadData() {
   const manifest = await (await fetch('data/manifest.json')).json();
   state.packs = manifest.packs;
-  const lists = await Promise.all(
-    manifest.packs.filter((p) => p.kind === 'verbs').map((p) => fetch(`data/${p.file}`).then((r) => r.json())),
-  );
-  state.verbs = lists.flat();
+  const load = (kind) =>
+    Promise.all(manifest.packs.filter((p) => p.kind === kind).map((p) => fetch(`data/${p.file}`).then((r) => r.json())));
+  const [verbLists, vocabPacks] = await Promise.all([load('verbs'), load('vocab')]);
+  state.verbs = verbLists.flat();
+  for (const pack of vocabPacks) {
+    Object.assign(state.vocab.topics, pack.topics);
+    state.vocab.items.push(...pack.items);
+  }
 }
 
 async function main() {
@@ -492,9 +673,11 @@ async function main() {
     return;
   }
   renderFooter();
+  buildControls(); // now with the vocabulary topics
   state.q = newQuestion();
   state.phase = 'answering';
   redrawCurrent();
+  if (location.hash === '#review') showReview(true);
 }
 
 main();
