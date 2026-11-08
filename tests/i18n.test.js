@@ -2,10 +2,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { TENSES } from '../js/conjugate.js';
+import { TENSES, conjugate, accepted } from '../js/conjugate.js';
 import { makeQuestion, seededRng, distractorPool } from '../js/quiz.js';
 import { explanationNotes, hintNotes, noteContext } from '../js/explain.js';
-import { LANGS, uiKeys, noteKeys, renderNote, tenseName } from '../js/i18n.js';
+import { LANGS, uiKeys, noteKeys, renderNote, tenseName, tenseLabel, tenseShort, tenseInfoHtml } from '../js/i18n.js';
 
 const verbs = JSON.parse(readFileSync(new URL('../data/verbs.json', import.meta.url), 'utf8'));
 
@@ -13,6 +13,35 @@ test('both languages define the same page text and notes', () => {
   assert.deepEqual(uiKeys('es').sort(), uiKeys('en').sort());
   assert.deepEqual(noteKeys('es').sort(), noteKeys('en').sort());
   for (const lang of LANGS) for (const tense of TENSES) assert.ok(tenseName(lang, tense.id), `${lang} ${tense.id}`);
+});
+
+test('every tense has a plain-language description and example in both languages', () => {
+  for (const lang of LANGS) {
+    for (const tense of TENSES) {
+      assert.match(tenseLabel(lang, tense.id), /^.+ \(.+\)$/, `${lang} ${tense.id}`);
+      const html = tenseInfoHtml(lang, tense.id);
+      assert.ok(!html.includes('undefined'), `${lang} ${tense.id}: ${html}`);
+      assert.match(html, /<em>.+<\/em>/, `${lang} ${tense.id}: example needs a highlighted verb`);
+    }
+  }
+});
+
+test('tense descriptions never contain a form that could be the answer', () => {
+  const words = (s) => s.toLowerCase().replace(/<[^>]+>/g, ' ').split(/[^a-záéíóúüñ]+/).filter(Boolean);
+  const notGiveaways = new Set(['me', 'te', 'se', 'nos', 'os', 'no']);
+  const tables = verbs.map((v) => conjugate(v).table);
+  for (const tense of TENSES) {
+    const answers = new Set();
+    for (const table of tables) {
+      for (const f of table[tense.id]) for (const form of accepted(f)) for (const w of words(form)) answers.add(w);
+    }
+    for (const lang of LANGS) {
+      // The description, not the grammar name ("Presente" is unavoidable).
+      const shown = words(`${tenseShort(lang, tense.id)} ${tenseInfoHtml(lang, tense.id)}`);
+      const leaks = shown.filter((w) => answers.has(w) && !notGiveaways.has(w));
+      assert.deepEqual(leaks, [], `${lang} ${tense.id} description contains answer words`);
+    }
+  }
 });
 
 test('explanations and hints render for every verb in every tense', () => {
