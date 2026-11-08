@@ -1,0 +1,13 @@
+/* Applied only while a screenshot is taken (toHaveScreenshot's stylePath).
+   Headless WebKit captures the card's 3D flip transforms unreliably (the
+   front face sometimes comes out blank), so screenshots show the resting
+   card flat: the face in front, the other one hidden. */
+.card,
+.face,
+.face.back {
+  transform: none !important;
+}
+
+.face[inert] {
+  visibility: hidden !important;
+}

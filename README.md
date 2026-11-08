@@ -37,6 +37,11 @@ links its authors. **Idioms**, **conversation** (pick the best reply) and
 **grammar** (ser/estar, por/para, preterite/imperfect, subjunctive, gustar)
 are always multiple choice, whatever the Mode.
 
+After a miss (or a skip), every multiple-choice option shows what it means,
+so all four can be compared: *tuve — I had*, *tenía — I used to have*,
+*tuvo — he/she had*, and *tení — not a real form*. For vocabulary, idioms and
+conversation the options show their translations.
+
 When typing, `a'` becomes `á`, `n~` becomes `ñ` and `u"` becomes `ü`. A
 missing accent counts as correct with a reminder, unless *Strict accents* is
 ticked or the unaccented word is a different form (*hablo* vs *habló*). For
@@ -72,6 +77,43 @@ python3 -m http.server 8000
 node --test            # engine, quiz logic, translations and content checks
 ```
 
+### Rendering tests
+
+`tests/visual/` uses [Playwright](https://playwright.dev) to open the site on
+a desktop screen and four phones: Pixel 7, Pixel 11 and Galaxy S24 (360px,
+the most common Android width) in Chromium, the engine of Chrome on Android,
+and iPhone 14 in WebKit, Safari's engine. These are emulated: the screen size,
+pixel density, touch and browser identity of each phone, not a real device.
+
+- `layout.spec.js` checks rules that must always hold: the header keeps its
+  size when the language changes (at every desktop width), images keep their
+  proportions, nothing sticks out of the card or the screen, and every option
+  is explained after a miss.
+- `screens.spec.js` takes screenshots of the main screens (cards of each kind,
+  the Spanish page, a missed card, the review page, phone settings) and
+  compares them with the approved images in `tests/visual/snapshots/`.
+  Questions are seeded so the same cards come up every time.
+
+CI runs both in the official Playwright container (`render` job), and pages
+are only deployed when they pass. Screenshots depend on the installed fonts,
+so they are only compared on Linux; on a Mac the layout rules still run:
+
+```sh
+npm ci
+npx playwright install chromium webkit
+npx playwright test
+```
+
+**When a screenshot changes.** The `render` job fails and uploads two
+artifacts: `rendering-report` (open `index.html`: expected, actual and diff
+for each screenshot) and `visual-snapshots` (a complete new set). If the
+change is intended, approve it by committing the new set:
+
+```sh
+gh run download <run-id> -n visual-snapshots -D tests/visual/snapshots
+git add tests/visual/snapshots && git commit -m "Approve new screenshots"
+```
+
 The conjugation engine is also cross-checked against
 [verbecc](https://github.com/bretttolbert/verbecc), an independent conjugator:
 
@@ -90,8 +132,9 @@ node and spaCy with its Spanish model).
 
 ## Deployment
 
-`.github/workflows/deploy.yml` runs the tests on every pull request and push.
-Pushes to `main` that pass are published to GitHub Pages. The repository's
+`.github/workflows/deploy.yml` runs the unit tests (`test` job) and the
+rendering tests (`render` job) on every pull request and push. Pushes to
+`main` that pass both are published to GitHub Pages. The repository's
 Pages source must be set to **GitHub Actions** (Settings → Pages).
 `.github/workflows/crosscheck.yml` runs the verbecc comparison whenever the
 engine or verb list changes.
@@ -104,6 +147,7 @@ engine or verb list changes.
 | `js/quiz.js` | Picks questions for each Scope, builds multiple-choice distractors, grades typed answers |
 | `js/vocab.js` | Vocabulary questions, regional variants, article and gender grading |
 | `js/phrases.js` | Idiom, conversation and grammar questions |
+| `js/english.js` | English meanings of verb forms (*tuve — I had*), shown on the options after a miss |
 | `js/random.js` | Seeded randomness and level-weighted picking shared by every kind of question |
 | `js/review.js` | Maps questions to review topics, tracks misses, keeps the mistakes deck |
 | `js/explain.js` | Turns a question and a wrong answer into explanation and hint notes |

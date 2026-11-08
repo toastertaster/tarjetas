@@ -134,7 +134,6 @@ kbd {
 }
 
 select {
-  min-width: 8.5rem;
   padding: 0.35rem 0.5rem;
   font-size: 0.95rem;
   letter-spacing: normal;
@@ -144,8 +143,25 @@ select {
   background: var(--card);
 }
 
-#scope {
-  max-width: 14rem;
+/* Fixed widths: the options are longer in Spanish, and the header must not
+   change size (or wrap differently) when the language changes. Phones use a
+   two-column grid instead (below). */
+@media (min-width: 761px) {
+  #mode {
+    width: 11.5rem;
+  }
+
+  #scope {
+    width: 14rem;
+  }
+
+  #level {
+    width: 10rem;
+  }
+
+  #region {
+    width: 8.5rem;
+  }
 }
 
 /* Narrow screens: one slim row; the settings fold out from the ⚙ button. */
@@ -239,6 +255,11 @@ select:disabled {
   border: 1px solid var(--rule);
   border-radius: 999px;
   background: var(--card);
+}
+
+/* A fixed box, so "Review" / "Repaso" don't change the header's width. */
+.review-btn .label {
+  min-width: 4em;
 }
 
 .review-btn .count {
@@ -383,6 +404,7 @@ main {
 }
 
 .chip img {
+  width: auto; /* from the width/height attributes, so the flag isn't stretched */
   height: 0.8em;
   margin-right: 0.3em;
   vertical-align: -1px;
@@ -501,6 +523,15 @@ main {
 
 .option:disabled {
   cursor: default;
+}
+
+.option .meaning {
+  font-size: 0.85em;
+  color: var(--muted);
+}
+
+.option .meaning::before {
+  content: '— ';
 }
 
 .option .mark {

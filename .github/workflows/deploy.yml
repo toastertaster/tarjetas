@@ -1,7 +1,7 @@
 name: Test and deploy
 
-# Tests run on every pull request and push. Pushes to main that pass the tests
-# are published to GitHub Pages (repo Settings → Pages → Source: GitHub Actions).
+# Tests (unit and rendering) run on every pull request and push. Pushes to
+# main that pass them are published to GitHub Pages (repo Settings → Pages → Source: GitHub Actions).
 on:
   push:
     branches: [main]
@@ -22,9 +22,38 @@ jobs:
       - name: Unit tests and content checks
         run: node --test
 
+  # How the pages render, in Chromium and WebKit (Safari's engine), desktop
+  # and phone sizes: layout rules plus screenshots compared with the approved
+  # ones in tests/visual/snapshots. The pinned Playwright container keeps the
+  # fonts, and so the screenshots, identical from run to run.
+  render:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.65.0-noble
+    steps:
+      - uses: actions/checkout@v7
+      - run: npm ci
+      - name: Rendering tests
+        run: npx playwright test
+      # On failure: the report shows expected / actual / diff for every
+      # screenshot, and visual-snapshots holds a complete new set to commit
+      # if the change was intended (README, "Rendering tests").
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: rendering-report
+          path: playwright-report
+      - name: Make new screenshots for review
+        if: failure()
+        run: npx playwright test tests/visual/screens.spec.js --update-snapshots --reporter=list || true
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: visual-snapshots
+          path: tests/visual/snapshots
+
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: test
+    needs: [test, render]
     runs-on: ubuntu-latest
     permissions:
       pages: write

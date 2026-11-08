@@ -5,7 +5,7 @@
 import { TENSES, LEVELS, analyze } from './conjugate.js';
 import { makeQuestion, gradeTyped, scoreFor, subjectOf, NoQuestion, MODES, REGIONS } from './quiz.js';
 import { emptyPhrases } from './phrases.js';
-import { explanationNotes, hintNotes, noteContext, reveal } from './explain.js';
+import { explanationNotes, hintNotes, noteContext, reveal, optionMeaning } from './explain.js';
 import { needsReview, scopeFor } from './review.js';
 import {
   t,
@@ -169,8 +169,12 @@ function renderFooter() {
 // ---------------------------------------------------------------------------
 // Rendering a card face
 
+// Flag images carry their proportions, so no browser stretches them.
+const FLAG_SIZE = { mx: [21, 12], es: [15, 10], us: [19, 10] };
+
 function flag(region) {
-  return `<span class="chip"><img src="img/flags/${region}.svg" alt="">${esc(T(`badge.${region}`))}</span>`;
+  const [w, h] = FLAG_SIZE[region];
+  return `<span class="chip"><img src="img/flags/${region}.svg" width="${w}" height="${h}" alt="">${esc(T(`badge.${region}`))}</span>`;
 }
 
 // The language of the options and the answer.
@@ -442,12 +446,21 @@ function record(score) {
   if (change) toast(T(change === 'up' ? 'levelUp' : 'levelDown', { level: progress.auto.level }));
 }
 
+// After a miss every option shows what it means, so they can be compared.
+function meaningHtml(q, o) {
+  const m = optionMeaning(q, o);
+  if (!m) return '';
+  const text = m.invented ? `<i>${esc(T('invented'))}</i>` : `<span lang="${m.lang}">${esc(m.text)}</span>`;
+  return `<span class="meaning">${text}</span>`;
+}
+
 // Show the result on the card: highlight options, lock the inputs.
 function markAnswered(face, outcome = state.outcome) {
   const q = state.q;
   for (const b of $$('.option', face)) {
     const o = q.options[Number(b.dataset.i)];
     b.disabled = true;
+    if (outcome && !$('.meaning', b)) $('span[lang]', b).insertAdjacentHTML('afterend', meaningHtml(q, o));
     if (o.eliminated) b.classList.add('eliminated');
     if (o.correct) {
       b.classList.add('correct');
