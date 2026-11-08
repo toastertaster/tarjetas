@@ -39,6 +39,8 @@ test('the header keeps its size when the language changes', async ({ page, isMob
 // Every visible image is drawn with the proportions it declares (its width and
 // height attributes, or its own size).
 async function expectImagesInProportion(page, where) {
+  // measure the resting layout, not a card halfway through its fade or flip
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
   const bad = await page.evaluate(() =>
     [...document.images]
       .filter((img) => img.offsetParent && img.complete)

@@ -79,8 +79,11 @@ node --test            # engine, quiz logic, translations and content checks
 
 ### Rendering tests
 
-`tests/visual/` uses [Playwright](https://playwright.dev) to open the site in
-Chromium and WebKit (Safari's engine), on a desktop screen and two phones:
+`tests/visual/` uses [Playwright](https://playwright.dev) to open the site on
+a desktop screen and four phones: Pixel 7, Pixel 11 and Galaxy S24 (360px,
+the most common Android width) in Chromium, the engine of Chrome on Android,
+and iPhone 14 in WebKit, Safari's engine. These are emulated: the screen size,
+pixel density, touch and browser identity of each phone, not a real device.
 
 - `layout.spec.js` checks rules that must always hold: the header keeps its
   size when the language changes (at every desktop width), images keep their
