@@ -1,7 +1,7 @@
 // Layout rules that must hold in every browser and screen size. Unlike the
 // screenshots, these don't depend on fonts, so they run anywhere.
 import { test, expect } from '@playwright/test';
-import { openApp, face, skip, next, cardWhere, choose, showSettings } from './helpers.js';
+import { openApp, face, skip, showAnswer, next, cardWhere, choose, showSettings } from './helpers.js';
 
 const headerHeight = (page) => page.locator('#topbar').evaluate((el) => el.getBoundingClientRect().height);
 
@@ -88,7 +88,11 @@ for (const [name, settings, want] of STATES) {
     if (want) await cardWhere(page, async (p) => (await want(p)) > 0);
     await expectImagesInProportion(page, `on ${name}`);
     await expectNoOverflow(page, `on ${name}`);
-    await skip(page);
+    // the hint button's longest label ("More help") still fits beside the others
+    await face(page).locator('.hint-btn').click();
+    await expect(face(page).locator('.hint-box')).toBeVisible();
+    await expectNoOverflow(page, `with a hint on ${name}`);
+    await showAnswer(page);
     const options = face(page).locator('.option');
     const n = await options.count();
     if (n && settings.scope !== 'grammar') {
@@ -104,13 +108,37 @@ for (const [name, settings, want] of STATES) {
 test('the review page fits the screen', async ({ page }) => {
   await openApp(page);
   for (let i = 0; i < 3; i++) {
-    await skip(page);
+    await showAnswer(page);
     await next(page);
   }
   await page.click('#review-btn');
   await expect(page.locator('#review-view')).toBeVisible();
   await expectNoOverflow(page, 'on the review page');
   await expectImagesInProportion(page, 'on the review page');
+});
+
+test('Skip moves straight on without scoring; Show answer explains without scoring', async ({ page }) => {
+  await openApp(page);
+  const score = await page.locator('#score').innerText();
+  const first = await face(page).locator('.verb').innerText();
+  await skip(page);
+  await expect(page.locator('#feedback')).toBeHidden();
+  await expect(face(page).locator('.verb')).not.toHaveText(first);
+  await showAnswer(page);
+  await expect(page.locator('#feedback h2')).toHaveText(/not scored/);
+  await expect(face(page)).not.toHaveClass(/is-wrong/);
+  expect(await page.locator('#score').innerText()).toBe(score);
+});
+
+test('a verb meaning hint shows the verb in a real sentence', async ({ page }) => {
+  await openApp(page, { settings: { scope: 'meanings' } });
+  await cardWhere(page, async (p) => (await face(p).locator('.verb[lang=es]').count()) > 0);
+  await page.keyboard.press('h');
+  const hint = face(page).locator('.hint-box');
+  await expect(hint).toContainText(/in a sentence/);
+  await expect(hint.locator('a[href*="tatoeba.org"]')).toHaveCount(1);
+  await expect(hint.locator('[lang=es] b')).not.toHaveCount(0);
+  await expectNoOverflow(page, 'with a meaning hint');
 });
 
 test('switching scopes keeps the page within the screen', async ({ page }) => {

@@ -7,7 +7,7 @@
 // compared in the Linux Playwright container used by CI. Set SNAPSHOTS=1 to
 // run them elsewhere anyway (against images made on that machine).
 import { test, expect } from '@playwright/test';
-import { openApp, face, skip, cardWhere, miss, showSettings } from './helpers.js';
+import { openApp, face, showAnswer, cardWhere, miss, showSettings } from './helpers.js';
 
 test.skip(process.platform !== 'linux' && !process.env.SNAPSHOTS, 'screenshots are compared on Linux (see README)');
 
@@ -35,11 +35,19 @@ test('vocabulary card with a region flag', async ({ page }) => {
   await shot(page, 'vocab-region');
 });
 
-test('sentence card, skipped', async ({ page }) => {
+test('sentence card, answer shown', async ({ page }) => {
   await openApp(page, { settings: { scope: 'sentences' } });
   await shot(page, 'sentence');
-  await skip(page);
-  await shot(page, 'sentence-skipped');
+  await showAnswer(page);
+  await shot(page, 'sentence-answer');
+});
+
+test('verb meaning card with its hint', async ({ page }) => {
+  await openApp(page, { settings: { scope: 'meanings' } });
+  await cardWhere(page, async (p) => (await face(p).locator('.verb[lang=es]').count()) > 0);
+  await page.keyboard.press('h');
+  await expect(face(page).locator('.hint-box a')).toHaveCount(1);
+  await shot(page, 'meaning-hint');
 });
 
 test('idiom card', async ({ page }) => {

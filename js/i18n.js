@@ -54,6 +54,7 @@ const UI = {
     hint: 'Hint',
     hintMore: 'More help',
     skip: 'Skip',
+    showAnswer: 'Show answer',
     next: 'Next',
     submit: 'Check',
     strict: 'Strict accents',
@@ -62,7 +63,7 @@ const UI = {
     correct: 'Correct!',
     accent: 'Correct — but watch the accent: {answer}',
     wrong: 'Not quite.',
-    skipped: 'Skipped.',
+    shown: 'Answer shown (not scored)',
     answerIs: 'Answer: {answer}',
     alsoAccepted: 'Also accepted: {alts}',
     continue: 'Press Enter to continue',
@@ -110,9 +111,10 @@ const UI = {
     'keys.title': 'Keyboard shortcuts',
     'keys.options': 'Pick an answer',
     'keys.enter': 'Check the answer / go to the next card',
-    'keys.esc': 'Skip (shows the answer)',
+    'keys.esc': 'Skip to the next card (not scored)',
     'keys.hint': 'Hint (press again for more)',
-    'keys.hintTyped': 'Hint while typing in the answer box',
+    'keys.answer': 'Show the answer (not scored)',
+    'keys.typed': 'Hint / show the answer while typing in the answer box',
     'keys.help': 'Show this help',
     'keys.accents': "Type a' e' i' o' u' for á é í ó ú, n~ for ñ and u\" for ü.",
     close: 'Close',
@@ -158,6 +160,7 @@ const UI = {
     hint: 'Pista',
     hintMore: 'Más ayuda',
     skip: 'Saltar',
+    showAnswer: 'Ver respuesta',
     next: 'Siguiente',
     submit: 'Comprobar',
     strict: 'Acentos estrictos',
@@ -166,7 +169,7 @@ const UI = {
     correct: '¡Correcto!',
     accent: 'Correcto, pero ojo con el acento: {answer}',
     wrong: 'No exactamente.',
-    skipped: 'Saltada.',
+    shown: 'Respuesta mostrada (no cuenta)',
     answerIs: 'Respuesta: {answer}',
     alsoAccepted: 'También vale: {alts}',
     continue: 'Pulsa Enter para continuar',
@@ -214,9 +217,10 @@ const UI = {
     'keys.title': 'Atajos de teclado',
     'keys.options': 'Elegir una respuesta',
     'keys.enter': 'Comprobar / pasar a la siguiente tarjeta',
-    'keys.esc': 'Saltar (muestra la respuesta)',
+    'keys.esc': 'Saltar a la siguiente tarjeta (no cuenta)',
     'keys.hint': 'Pista (pulsa otra vez para más)',
-    'keys.hintTyped': 'Pista mientras escribes la respuesta',
+    'keys.answer': 'Ver la respuesta (no cuenta)',
+    'keys.typed': 'Pista / ver la respuesta mientras escribes',
     'keys.help': 'Mostrar esta ayuda',
     'keys.accents': 'Escribe a\' e\' i\' o\' u\' para á é í ó ú, n~ para ñ y u" para ü.',
     close: 'Cerrar',
@@ -497,6 +501,20 @@ const personName = (lang, n, c) => {
   return (lang === 'en' ? ' for ' : ' de ') + b(personLabel(n.why.tense ?? c.tense, p));
 };
 
+const tatoebaLink = (id) =>
+  `<a href="https://tatoeba.org/en/sentences/show/${encodeURIComponent(id)}" target="_blank" rel="noopener">#${esc(id)}</a>`;
+
+/**
+ * "Sentence #123 by X, translation #456 by Y": the attribution Tatoeba's
+ * license asks for, of the sentence and (when shown) its translation.
+ */
+export function tatoebaCredit(lang, s, { translation = true } = {}) {
+  const parts = [t(lang, 'credit.sentence', { link: tatoebaLink(s.id), by: esc(s.by) })];
+  if (translation) parts.push(t(lang, 'credit.translation', { link: tatoebaLink(s.enId), by: esc(s.enBy) }));
+  return `${parts.join(', ')} · Tatoeba, CC BY 2.0 FR`;
+}
+const creditSmall = (lang, n, opts) => `<small class="credit">${tatoebaCredit(lang, n, opts)}</small>`;
+
 // A Tatoeba sentence with its verb in bold.
 const sentenceHtml = (n) =>
   `<span lang="es">${esc(n.es.slice(0, n.blank[0]))}<b>${esc(n.es.slice(n.blank[0], n.blank[1]))}</b>${esc(n.es.slice(n.blank[1]))}</span>`;
@@ -595,7 +613,11 @@ const NOTES = {
     },
     meaning: { explain: (n) => `${b(n.inf)} means “${esc(n.en)}”.` },
     'picked-meaning': { explain: (n) => `You chose: ${b(n.inf)} means “${esc(n.en)}”.`, hint: () => null },
-    'meaning-hint': { explain: (n) => `It starts with “${esc(n.letter)}”.` },
+    'meaning-hint': { explain: (n) => `${n.english ? 'In English it' : 'It'} starts with “${esc(n.letter)}”.` },
+    'verb-example': {
+      explain: (n) => `${sentenceHtml(n)} — “${esc(n.en)}” ${creditSmall('en', n)}`,
+      hint: (n) => `Here it is in a sentence: ${sentenceHtml(n)} ${creditSmall('en', n, { translation: false })}`,
+    },
     'vocab-meaning': { explain: (n) => `${b(n.es)} means “${esc(n.en)}”.` },
     'vocab-regions': { explain: (n) => `Mexico: ${b(n.mx)} · Spain: ${b(n.es)}` },
     'picked-vocab': { explain: (n) => `You chose: ${b(n.es)} means “${esc(n.en)}”.`, hint: () => null },
@@ -717,7 +739,11 @@ const NOTES = {
     },
     meaning: { explain: (n) => `${b(n.inf)} significa “${esc(n.en)}”.` },
     'picked-meaning': { explain: (n) => `Elegiste: ${b(n.inf)} significa “${esc(n.en)}”.`, hint: () => null },
-    'meaning-hint': { explain: (n) => `Empieza por “${esc(n.letter)}”.` },
+    'meaning-hint': { explain: (n) => `${n.english ? 'En inglés empieza' : 'Empieza'} por “${esc(n.letter)}”.` },
+    'verb-example': {
+      explain: (n) => `${sentenceHtml(n)} — “${esc(n.en)}” ${creditSmall('es', n)}`,
+      hint: (n) => `Así se usa en una frase: ${sentenceHtml(n)} ${creditSmall('es', n, { translation: false })}`,
+    },
     'vocab-meaning': { explain: (n) => `${b(n.es)} significa “${esc(n.en)}”.` },
     'vocab-regions': { explain: (n) => `México: ${b(n.mx)} · España: ${b(n.es)}` },
     'picked-vocab': { explain: (n) => `Elegiste: ${b(n.es)} significa “${esc(n.en)}”.`, hint: () => null },

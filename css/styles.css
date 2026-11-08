@@ -664,27 +664,48 @@ main {
   bottom: 0.9rem;
   left: 1.25rem;
   display: flex;
+  gap: 0.5rem;
   align-items: center;
-  justify-content: space-between;
 }
 
-.skip-btn,
-.hint-btn {
+.card-actions button {
   padding: 0.35rem 0.85rem;
   font-size: 0.9rem;
+  white-space: nowrap;
   border: 1px solid var(--rule);
   border-radius: 999px;
   background: var(--card);
 }
 
-.skip-btn {
+/* Skip and Show answer on the left, Hint on the right. */
+.skip-btn,
+.answer-btn {
   color: var(--muted);
 }
 
-.hint-btn:disabled,
-.skip-btn:disabled {
+.hint-btn {
+  margin-left: auto;
+}
+
+.card-actions button:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+/* Phones: three buttons only fit without their keyboard shortcuts. */
+@media (max-width: 540px) {
+  .card-actions {
+    right: 1.1rem;
+    left: 1.1rem;
+  }
+
+  .card-actions button {
+    padding: 0.35rem 0.7rem;
+  }
+
+  .card-actions kbd {
+    display: none;
+  }
 }
 
 /* Feedback panel --------------------------------------------------------- */
@@ -703,6 +724,19 @@ main {
   margin: 0 0 0.25rem;
   font-size: 1.1rem;
   color: var(--bad);
+}
+
+/* The answer was asked for, not missed. */
+.feedback.shown {
+  border-left-color: var(--rule);
+}
+
+.feedback.shown h2 {
+  color: var(--muted);
+}
+
+small.credit {
+  display: block;
 }
 
 .feedback .answer {

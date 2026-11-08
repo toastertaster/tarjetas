@@ -34,12 +34,51 @@ export function noteContext(q) {
   return ctx;
 }
 
+// "to break; to tear (paper)" → ["brea", "tear", "pape"]: word stems that
+// show a translation uses the verb in the meaning being taught.
+const GLOSS_FILLER = new Set(['to', 'get', 'one', 'someone', 'something', 'oneself', 'out', 'up', 'down', 'off', 'with', 'for', 'about']);
+const stems = (text) =>
+  text
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((w) => w.length > 1 && !GLOSS_FILLER.has(w))
+    .map((w) => w.slice(0, 4));
+
+/**
+ * A real sentence that uses the verb, to work out what it means from context,
+ * or null. Of the Tatoeba sentences for the verb that suit the region, the
+ * best is one whose translation uses the verb's meaning (not an idiom like
+ * "te eché de menos" for echar), and then one of about five words: enough
+ * context, little else to read.
+ */
+export function exampleFor(verb, sentences, region) {
+  const meaning = new Set(stems(verb.en));
+  const rank = (s) => [
+    stems(s.en).some((w) => meaning.has(w)) ? 0 : 1,
+    Math.abs(s.es.split(' ').length - 5),
+    s.es.length,
+    s.id,
+  ];
+  let best = null;
+  let bestRank = null;
+  for (const s of sentences) {
+    if (s.inf !== verb.inf || (s.region && region !== 'both' && s.region !== region)) continue;
+    const r = rank(s);
+    const i = bestRank ? r.findIndex((x, k) => x !== bestRank[k]) : 0;
+    if (!bestRank || (i >= 0 && r[i] < bestRank[i])) [best, bestRank] = [s, r];
+  }
+  return best;
+}
+
+const exampleNote = (s) => ({ key: 'verb-example', es: s.es, blank: s.blank, en: s.en, id: s.id, by: s.by, enId: s.enId, enBy: s.enBy });
+
 /**
  * Notes for the feedback panel.
- *   picked – the wrong multiple-choice option, if any
- *   grade  – the result of gradeTyped, if the answer was typed
+ *   picked  – the wrong multiple-choice option, if any
+ *   grade   – the result of gradeTyped, if the answer was typed
+ *   example – a sentence using the verb (exampleFor), for meaning questions
  */
-export function explanationNotes(q, { picked = null, grade = null } = {}) {
+export function explanationNotes(q, { picked = null, grade = null, example = null } = {}) {
   if (q.kind === 'vocab') return vocabNotes(q, { picked, grade });
   if (q.kind === 'idiom') return idiomNotes(q, picked);
   if (q.kind === 'conversation') return conversationNotes(q, picked);
@@ -49,6 +88,7 @@ export function explanationNotes(q, { picked = null, grade = null } = {}) {
   if (q.kind === 'meaning') {
     notes.push({ key: 'meaning', inf: q.verb.inf, en: q.verb.en });
     if (picked?.why?.kind === 'meaning') notes.push({ key: 'picked-meaning', inf: picked.why.verb.inf, en: picked.why.verb.en });
+    if (example) notes.push(exampleNote(example));
   } else {
     if (picked?.why) notes.push({ key: 'picked', form: picked.text, why: picked.why });
     if (grade?.why) notes.push({ key: 'picked', form: grade.typed, why: grade.why });
@@ -142,15 +182,21 @@ export function optionMeaning(q, o) {
 const firstLetter = (s) => s.replace(/^[¡¿]/, '')[0];
 
 // First hint: the rules that apply, without giving the form away.
-export function hintNotes(q) {
+//   example – a sentence using the verb (exampleFor), for meaning questions
+export function hintNotes(q, { example = null } = {}) {
   if (q.kind === 'vocab') {
     if (q.dir === 'es-en') return [{ key: 'meaning-hint', letter: firstLetter(q.item.en) }];
     const { core } = splitArticle(q.answer.form);
     return [{ key: 'vocab-hint', letter: firstLetter(core), gender: genderOf(q.item, q.answer.form) }];
   }
   if (q.kind === 'meaning') {
-    const target = q.direction === 'es-en' ? q.verb.en.replace(/^to /, '') : q.verb.inf;
-    return [{ key: 'meaning-hint', letter: target[0] }];
+    // Spanish to English: the verb at work in a real sentence, so its meaning
+    // can be worked out from context (the translation comes with the answer).
+    // English to Spanish, a sentence would show the verb itself.
+    if (q.direction === 'es-en' && example) return [exampleNote(example)];
+    const english = q.direction === 'es-en';
+    const target = english ? q.verb.en.replace(/^to /, '') : q.verb.inf;
+    return [{ key: 'meaning-hint', letter: target[0], english }];
   }
   // Idioms: the word-for-word meaning gives the image without the answer;
   // asked the other way round, the literal meaning would give it away.
