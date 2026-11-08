@@ -134,6 +134,23 @@ select {
   max-width: 14rem;
 }
 
+@media (max-width: 600px) {
+  .brand {
+    flex-basis: 100%;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .controls select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+}
+
 select:disabled {
   opacity: 0.5;
 }
@@ -264,8 +281,25 @@ main {
   background: var(--chip);
 }
 
-.chip.level {
+.chip.level,
+.chip.tense {
   font-weight: 700;
+}
+
+/* What the tense means, between the margin line and the prompt */
+.tense-info {
+  margin: 0.55rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.tense-info .example {
+  font-style: italic;
+}
+
+.tense-info em {
+  font-weight: 700;
+  color: var(--ink);
 }
 
 .chip img {
@@ -276,7 +310,7 @@ main {
 }
 
 .instruction {
-  margin: 0.9rem 0 0;
+  margin: 0.4rem 0 0;
   font-size: 0.9rem;
   color: var(--muted);
 }

@@ -153,7 +153,7 @@ const TENSE_NAMES = {
     fut: 'Future',
     cond: 'Conditional',
     pres_perf: 'Present perfect',
-    pluperf: 'Past perfect (pluperfect)',
+    pluperf: 'Past perfect',
     fut_perf: 'Future perfect',
     cond_perf: 'Conditional perfect',
     past_ant: 'Past anterior',
@@ -165,12 +165,12 @@ const TENSE_NAMES = {
     subj_fut_perf: 'Future perfect subjunctive',
     imp_aff: 'Affirmative command',
     imp_neg: 'Negative command',
-    gerund: 'Gerund (-ing form)',
+    gerund: 'Gerund',
     participle: 'Past participle',
   },
   es: {
     pres: 'Presente',
-    pret: 'Pretérito (indefinido)',
+    pret: 'Pretérito indefinido',
     impf: 'Pretérito imperfecto',
     fut: 'Futuro',
     cond: 'Condicional',
@@ -193,6 +193,96 @@ const TENSE_NAMES = {
 };
 
 export const tenseName = (lang, id) => TENSE_NAMES[lang][id];
+
+// What each tense means, for learners who don't remember the grammar terms.
+//   short – shown in brackets after the tense name: "Preterite (simple past)"
+//   use   – one line on when the tense is used
+// These must never contain a Spanish verb form: it could be the answer to
+// the card (tests/i18n.test.js checks this for every verb).
+const TENSE_INFO = {
+  en: {
+    pres: ['now / usually', 'What happens now or regularly.'],
+    pret: ['simple past', 'Finished actions at a specific time in the past.'],
+    impf: ['was doing / used to', 'Ongoing or repeated actions, and descriptions, in the past.'],
+    fut: ['will', 'What will happen; also guesses about the present.'],
+    cond: ['would', 'What would happen; also polite requests.'],
+    pres_perf: ['have done', 'Past actions connected to now. Spain also uses it for things done today, where Mexico usually prefers the preterite.'],
+    pluperf: ['had done', 'An action completed before another moment in the past.'],
+    fut_perf: ['will have done', 'What will be finished by a moment in the future; also guesses about the past.'],
+    cond_perf: ['would have done', 'What would have happened, but didn\'t.'],
+    past_ant: ['had done, literary', 'Right after another past action. Found almost only in formal writing.'],
+    subj_pres: ['wishes, doubts', 'After expressions of wishing, doubt, emotion or requests, usually after que.'],
+    subj_impf: ['if I were…', 'The subjunctive in the past, and in unreal "if" clauses.'],
+    subj_perf: ['that I have done', 'The subjunctive for something that has already happened.'],
+    subj_pluperf: ['if I had done', 'Unreal conditions in the past, and impossible wishes.'],
+    subj_fut: ['archaic', 'Old-fashioned: only in legal texts and set phrases.'],
+    subj_fut_perf: ['archaic', 'Old-fashioned: only in legal texts.'],
+    imp_aff: ['Do it!', 'Telling someone to do something.'],
+    imp_neg: ["Don't do it!", 'Telling someone not to do something.'],
+    gerund: ['-ing form', 'With estar it means "to be doing".'],
+    participle: ['-ed / -en form', 'Used with haber to form the perfect tenses, and as an adjective.'],
+  },
+  es: {
+    pres: ['ahora / habitual', 'Acciones actuales o habituales.'],
+    pret: ['pasado simple', 'Acciones terminadas en un momento concreto del pasado.'],
+    impf: ['pasado en curso / hábitos', 'Acciones en curso, hábitos y descripciones en el pasado.'],
+    fut: ['acciones venideras', 'Acciones venideras y suposiciones sobre el presente.'],
+    cond: ['hipótesis', 'Situaciones hipotéticas y peticiones corteses.'],
+    pres_perf: ['acción reciente', 'Acciones ya ocurridas pero conectadas con el presente. En España también para lo ocurrido hoy; en México se prefiere el pretérito.'],
+    pluperf: ['anterior a otra acción', 'Una acción terminada antes de otro momento ya ocurrido.'],
+    fut_perf: ['acción completa en el futuro', 'Acciones terminadas antes de un momento futuro; también suposiciones sobre lo ocurrido.'],
+    cond_perf: ['hipótesis irreal', 'Hipótesis irreales sobre lo ya ocurrido.'],
+    past_ant: ['literario', 'Justo antes de otra acción, en relatos. Casi solo en textos formales.'],
+    subj_pres: ['deseos, dudas', 'Tras expresiones de deseo, duda, emoción o petición, normalmente con que.'],
+    subj_impf: ['hipótesis, pasado', 'Subjuntivo en el pasado y en condiciones irreales con si.'],
+    subj_perf: ['algo ya ocurrido', 'Subjuntivo sobre algo ya ocurrido.'],
+    subj_pluperf: ['condición irreal', 'Condiciones irreales sobre lo ya ocurrido y deseos imposibles.'],
+    subj_fut: ['arcaico', 'Anticuado: solo en textos legales y frases hechas.'],
+    subj_fut_perf: ['arcaico', 'Anticuado: solo en textos legales.'],
+    imp_aff: ['órdenes', 'Órdenes, instrucciones y consejos directos.'],
+    imp_neg: ['prohibiciones', 'Prohibiciones y consejos en negativo.'],
+    gerund: ['forma en -ndo', 'Con estar expresa una acción en curso.'],
+    participle: ['forma en -do', 'Con haber forma los tiempos compuestos; también funciona como adjetivo.'],
+  },
+};
+
+// English example sentences, with the verb phrase that matches the tense
+// between asterisks. English on purpose: a Spanish example could contain the
+// answer.
+const TENSE_EXAMPLES = {
+  pres: 'I *eat* breakfast every day.',
+  pret: 'Yesterday I *ate* at noon.',
+  impf: 'I *was eating* when you called. As a kid, I *used to eat* cereal.',
+  fut: 'Tomorrow I *will eat* early.',
+  cond: 'I *would eat* more if I were hungry.',
+  pres_perf: 'I *have* already *eaten*.',
+  pluperf: 'I *had* already *eaten* when you arrived.',
+  fut_perf: 'By eight o\'clock I *will have eaten*.',
+  cond_perf: 'I *would have eaten*, but there was no time.',
+  past_ant: 'As soon as he *had eaten*, he left.',
+  subj_pres: 'I want you *to eat* more.',
+  subj_impf: 'If I *ate* more, I would grow.',
+  subj_perf: 'I\'m glad you *have eaten*.',
+  subj_pluperf: 'If I *had eaten*, I wouldn\'t be hungry now.',
+  subj_fut: 'Whoever *shall enter* must pay.',
+  subj_fut_perf: 'If anyone *shall have broken* this law…',
+  imp_aff: '*Eat* your vegetables!',
+  imp_neg: '*Don\'t eat* that!',
+  gerund: 'I am *eating* right now.',
+  participle: 'I have *eaten*. The door is *closed*.',
+};
+
+export const tenseShort = (lang, id) => TENSE_INFO[lang][id][0];
+
+// "Preterite (simple past)" – the tense name with its plain meaning.
+export const tenseLabel = (lang, id) => `${tenseName(lang, id)} (${tenseShort(lang, id)})`;
+
+// One line for the card: when the tense is used, and an English example.
+export function tenseInfoHtml(lang, id) {
+  const example = esc(TENSE_EXAMPLES[id]).replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  const eg = lang === 'en' ? 'e.g.' : 'p. ej.';
+  return `${esc(TENSE_INFO[lang][id][1])} <span class="example">${eg} <q lang="en">${example}</q></span>`;
+}
 
 const PERSON_LABELS = ['yo', 'tú', 'él / ella / usted', 'nosotros', 'vosotros', 'ellos / ellas / ustedes'];
 const IMPERATIVE_LABELS = [null, 'tú', 'usted', 'nosotros', 'vosotros', 'ustedes'];

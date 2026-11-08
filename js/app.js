@@ -4,7 +4,7 @@
 import { TENSES, LEVELS, analyze } from './conjugate.js';
 import { makeQuestion, gradeTyped, scoreFor, MODES, REGIONS } from './quiz.js';
 import { explanationNotes, hintNotes, noteContext, reveal } from './explain.js';
-import { t, tenseName, personLabel, renderNote, esc, LANGS } from './i18n.js';
+import { t, tenseLabel, tenseInfoHtml, personLabel, renderNote, esc, LANGS } from './i18n.js';
 import { Progress } from './progress.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -60,7 +60,7 @@ function buildControls() {
     const group = document.createElement('optgroup');
     group.label = T(`mood.${mood}`);
     for (const tense of TENSES.filter((x) => x.mood === mood)) {
-      group.append(option(`tense:${tense.id}`, `${tenseName(lang(), tense.id)} · ${tense.level}`, s.scope));
+      group.append(option(`tense:${tense.id}`, `${tenseLabel(lang(), tense.id)} · ${tense.level}`, s.scope));
     }
     scope.append(group);
   }
@@ -142,9 +142,12 @@ function answerHtml(q, id) {
 }
 
 function renderFace(face, q) {
-  const tense = q.kind === 'conj' ? `<span class="chip">${esc(tenseName(lang(), q.tense))}</span>` : `<span class="chip">${esc(T('mode.meaning'))}</span>`;
+  const conj = q.kind === 'conj';
+  const chip = esc(conj ? tenseLabel(lang(), q.tense) : T('mode.meaning'));
+  const info = conj ? `<p class="tense-info">${tenseInfoHtml(lang(), q.tense)}</p>` : '';
   face.innerHTML = `
-    <div class="meta">${tense}<span class="chip level">${esc(q.level)}</span>${q.region ? flag(q.region) : ''}</div>
+    <div class="meta"><span class="chip tense">${chip}</span><span class="chip level">${esc(q.level)}</span>${q.region ? flag(q.region) : ''}</div>
+    ${info}
     ${promptHtml(q)}
     ${answerHtml(q, state.turn)}
     <div class="hint-box" hidden></div>
