@@ -3,6 +3,7 @@
 
 import { analyze, TENSE_BY_ID } from './conjugate.js';
 import { VOSOTROS, tables } from './quiz.js';
+import { formsFor, genderOf, isRegional, splitArticle } from './vocab.js';
 
 // Engine tags with no note of their own (the tense rule already covers them).
 export const SILENT_TAGS = new Set(['subj-from-yo']);
@@ -22,6 +23,7 @@ function tagNotes(q) {
 
 // Context every note template may use.
 export function noteContext(q) {
+  if (q.kind === 'vocab') return { form: q.answer.form };
   const ctx = { inf: q.verb.inf, form: q.answer.form, tense: q.tense, person: q.person };
   if (q.kind === 'conj') {
     ctx.cls = analyze(q.verb).cls;
@@ -36,6 +38,7 @@ export function noteContext(q) {
  *   grade  – the result of gradeTyped, if the answer was typed
  */
 export function explanationNotes(q, { picked = null, grade = null } = {}) {
+  if (q.kind === 'vocab') return vocabNotes(q, { picked, grade });
   const notes = [];
   if (q.kind === 'meaning') {
     notes.push({ key: 'meaning', inf: q.verb.inf, en: q.verb.en });
@@ -46,12 +49,36 @@ export function explanationNotes(q, { picked = null, grade = null } = {}) {
     notes.push(...tenseRule(q), ...tagNotes(q));
     if (q.person === VOSOTROS) notes.push({ key: 'vosotros' });
   }
-  if (q.verb.note) notes.push({ key: 'verb-note', note: q.verb.note });
+  if (q.verb.note) notes.push({ key: 'note', note: q.verb.note });
   return notes;
 }
 
+function vocabNotes(q, { picked, grade }) {
+  const { item, vocabRegion: region } = q;
+  const notes = [];
+  if (picked?.why?.kind === 'vocab') {
+    const other = picked.why.item;
+    notes.push({ key: 'picked-vocab', es: formsFor(other, region).form, en: other.en });
+  }
+  if (grade?.why?.kind === 'gender') notes.push({ key: 'vocab-gender', expected: grade.why.expected, gender: grade.why.gender });
+  if (grade?.why?.kind === 'other-region') {
+    notes.push({ key: 'vocab-other-region', form: grade.why.form, region: grade.why.region, expected: q.answer.form, asked: region });
+  }
+  notes.push({ key: 'vocab-meaning', es: formsFor(item, region).form, en: item.en });
+  if (isRegional(item)) notes.push({ key: 'vocab-regions', mx: formsFor(item, 'mx').form, es: formsFor(item, 'es').form });
+  if (item.note) notes.push({ key: 'note', note: item.note });
+  return notes;
+}
+
+const firstLetter = (s) => s.replace(/^[¡¿]/, '')[0];
+
 // First hint: the rules that apply, without giving the form away.
 export function hintNotes(q) {
+  if (q.kind === 'vocab') {
+    if (q.dir === 'es-en') return [{ key: 'meaning-hint', letter: firstLetter(q.item.en) }];
+    const { core } = splitArticle(q.answer.form);
+    return [{ key: 'vocab-hint', letter: firstLetter(core), gender: genderOf(q.item, q.answer.form) }];
+  }
   if (q.kind === 'meaning') {
     const target = q.direction === 'es-en' ? q.verb.en.replace(/^to /, '') : q.verb.inf;
     return [{ key: 'meaning-hint', letter: target[0] }];

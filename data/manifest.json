@@ -7,6 +7,14 @@
       "title": "Core verbs",
       "source": "Written for tarjetas",
       "license": "MIT"
+    },
+    {
+      "id": "vocab",
+      "kind": "vocab",
+      "file": "vocab.json",
+      "title": "Everyday vocabulary",
+      "source": "Written for tarjetas",
+      "license": "MIT"
     }
   ]
 }

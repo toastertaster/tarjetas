@@ -63,6 +63,34 @@ test('settings and auto level persist; the session score does not', () => {
   assert.equal(again.level, 'C1');
 });
 
+test('old "Verb meanings" mode moves to the Scope setting', () => {
+  const storage = new MemoryStorage();
+  storage.setItem(STORAGE_KEY, JSON.stringify({ settings: { mode: 'meaning', scope: 'tense:pret' } }));
+  const p = new Progress(storage);
+  assert.equal(p.settings.mode, 'mc');
+  assert.equal(p.settings.scope, 'meanings');
+});
+
+test('practicing mistakes does not move the automatic level', () => {
+  const p = new Progress(new MemoryStorage());
+  p.set('scope', 'review');
+  for (let i = 0; i < AUTO_WINDOW; i++) p.record(0);
+  assert.equal(p.level, AUTO_START);
+  p.set('scope', 'cat:pret-strong');
+  for (let i = 0; i < AUTO_WINDOW; i++) p.record(0);
+  assert.equal(p.level, AUTO_START);
+});
+
+test('review history persists and can be cleared', () => {
+  const storage = new MemoryStorage();
+  const p = new Progress(storage);
+  const q = { kind: 'meaning', verb: { inf: 'poder', en: 'to be able to' }, key: 'meaning|poder|es-en', spec: { kind: 'meaning', inf: 'poder', direction: 'es-en' } };
+  p.record(0, q);
+  assert.equal(new Progress(storage).review.deck.length, 1);
+  p.resetReview();
+  assert.equal(new Progress(storage).review.deck.length, 0);
+});
+
 test('corrupt storage falls back to defaults', () => {
   const storage = new MemoryStorage();
   storage.setItem(STORAGE_KEY, '{not json');

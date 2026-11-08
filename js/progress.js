@@ -1,6 +1,7 @@
 // Settings, the automatic level and session score, persisted in localStorage.
 
 import { LEVELS } from './conjugate.js';
+import { emptyReview, recordAnswer } from './review.js';
 
 export const STORAGE_KEY = 'tarjetas.v1';
 export const AUTO_START = 'A2';
@@ -32,6 +33,20 @@ export function updateAuto(auto, score) {
   return { state: { level: auto.level, window }, change: null };
 }
 
+// Settings saved by older versions of the app.
+function migrate(settings) {
+  const s = { ...settings };
+  // "Verb meanings" moved from Mode to Scope.
+  if (s.mode === 'meaning') {
+    s.mode = 'mc';
+    s.scope = 'meanings';
+  }
+  return s;
+}
+
+// Practice scopes that are deliberately hard don't move the automatic level.
+const countsForAuto = (scope) => scope !== 'review' && !scope.startsWith('cat:');
+
 export class Progress {
   constructor(storage = null) {
     this.storage = storage;
@@ -41,17 +56,24 @@ export class Progress {
     } catch {
       saved = {};
     }
-    this.settings = { ...DEFAULT_SETTINGS, ...saved.settings };
+    this.settings = migrate({ ...DEFAULT_SETTINGS, ...saved.settings });
     this.auto = saved.auto && LEVELS.includes(saved.auto.level) ? saved.auto : { level: AUTO_START, window: [] };
+    this.review = saved.review?.cats && Array.isArray(saved.review.deck) ? saved.review : emptyReview();
     this.session = { answered: 0, correct: 0, streak: 0 };
   }
 
   save() {
     try {
-      this.storage?.setItem(STORAGE_KEY, JSON.stringify({ settings: this.settings, auto: this.auto }));
+      const data = { settings: this.settings, auto: this.auto, review: this.review };
+      this.storage?.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
       // storage full or disabled: progress just won't persist
     }
+  }
+
+  resetReview() {
+    this.review = emptyReview();
+    this.save();
   }
 
   set(key, value) {
@@ -64,8 +86,11 @@ export class Progress {
     return this.settings.level === 'auto' ? this.auto.level : this.settings.level;
   }
 
-  /** Record one answer. Returns 'up' / 'down' when the auto level changes. */
-  record(score) {
+  /**
+   * Record one answer to question `q` (optional in tests). Returns 'up' /
+   * 'down' when the auto level changes.
+   */
+  record(score, q = null) {
     this.session.answered += 1;
     if (score > 0) {
       this.session.correct += 1;
@@ -73,8 +98,9 @@ export class Progress {
     } else {
       this.session.streak = 0;
     }
+    if (q) this.review = recordAnswer(this.review, q, score > 0);
     let change = null;
-    if (this.settings.level === 'auto') {
+    if (this.settings.level === 'auto' && countsForAuto(this.settings.scope)) {
       const r = updateAuto(this.auto, score);
       this.auto = r.state;
       change = r.change;

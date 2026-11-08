@@ -65,6 +65,36 @@ Spelling changes (`busqué`, `pagué`, `empecé`, `cojo`, `sigo`, `venzo`,
 3. If verbecc can't conjugate the verb, add a golden table to
    `tests/conjugate.test.js`.
 
+## Vocabulary packs
+
+A pack of `kind: "vocab"` is an object with `topics` and `items`. Topics
+become entries in the Scope list; packs can add new topics or more words to
+existing ones.
+
+```json
+{
+  "topics": { "food": { "en": "Food & drink", "es": "Comida y bebida" } },
+  "items": [
+    { "id": "bread", "en": "bread", "es": "el pan", "level": "A1", "topic": "food" },
+    { "id": "juice", "en": "juice", "es": { "mx": "el jugo", "es": "el zumo" }, "level": "A1", "topic": "food" }
+  ]
+}
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `id` | yes | Unique, lowercase with dashes. Saved in learners' review history, so don't rename it. |
+| `en` | yes | English meaning(s), separated by `;`. Add a hint in brackets when a word is ambiguous: `"fish (as food)"`. |
+| `es` | yes | The Spanish word with its article (`"el pan"`), or `{ "mx": ..., "es": ... }` when Mexico and Spain use different words |
+| `alts` | optional | Other accepted answers: a list, or `{ "mx": [...], "es": [...] }` for regional words |
+| `level` | yes | CEFR level `A1`–`C2` |
+| `topic` | yes | A topic id from `topics` |
+| `gender` | rarely | `"m"` or `"f"` when the article misleads (`el agua` is feminine) |
+| `note` | optional | `{ "en": "...", "es": "..." }` usage note shown in explanations |
+
+Two words with the same Spanish spelling (*la llave*: key, and faucet in
+Mexico) are fine: a question never offers both meanings as options.
+
 ## Licensing rules for outside content
 
 - Only use sources whose license allows redistribution in this repository,

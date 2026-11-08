@@ -1,11 +1,31 @@
 // Question generation, multiple-choice distractors and answer grading.
 // Nothing here touches the DOM, so tests can drive it directly.
+//
+// The Mode setting says how to answer (multiple choice / typed / mixed); the
+// Scope setting says what is asked:
+//   verbs | tense:<id>  – conjugation, all tenses or one
+//   meanings            – what verbs mean (Spanish ↔ English)
+//   vocab | topic:<id>  – vocabulary, all topics or one
+//   cat:<category>      – conjugations that exercise one review category
+//   review              – the learner's own mistakes
+// Every question has a `key` (what exactly was asked) and a `spec` that
+// rebuilds it, so mistakes can be tracked and asked again.
 
 import { conjugate, accepted, analyze, TENSES, TENSE_BY_ID, LEVELS, PERSONS } from './conjugate.js';
+import { vocabQuestion, vocabQuestionFor, gradeVocab } from './vocab.js';
+import { conjCategories } from './review.js';
 
-export const MODES = ['mc', 'typed', 'meaning', 'mixed'];
+export const MODES = ['mc', 'typed', 'mixed'];
 export const REGIONS = ['mx', 'es', 'both'];
 export const VOSOTROS = 4;
+
+/** Thrown when the chosen scope has nothing to ask (e.g. an empty mistakes deck). */
+export class NoQuestion extends Error {
+  constructor(reason) {
+    super(`no question available: ${reason}`);
+    this.reason = reason;
+  }
+}
 
 const lvl = (l) => LEVELS.indexOf(l);
 
@@ -100,42 +120,114 @@ function chooseVerb(verbs, level, tenseLevel, rng, avoid) {
 /**
  * Build the next question.
  *   verbs    – entries from data/verbs.json
+ *   vocab    – { topics, items } from the vocabulary packs
  *   settings – { mode, scope, region }
  *   level    – the CEFR level to ask at (already resolved from "auto")
- *   recent   – infinitives asked recently, avoided when possible
+ *   recent   – subjects (infinitives, vocabulary ids) asked recently, avoided when possible
+ *   deck     – the mistakes deck, for scope "review"
  */
-export function makeQuestion({ verbs, settings, level, rng = Math.random, recent = [] }) {
+export function makeQuestion({ verbs, vocab = { items: [] }, settings, level, rng = Math.random, recent = [], deck = [] }) {
   const region = settings.region;
-  const regional = verbs.filter((v) => verbInRegion(v, region));
-  let mode = settings.mode;
-  if (mode === 'mixed') mode = weightedPick(['mc', 'typed', 'meaning'], (m) => ({ mc: 9, typed: 7, meaning: 4 })[m], rng);
+  const scope = settings.scope;
+  const mode = settings.mode === 'mixed' ? (rng() < 0.55 ? 'mc' : 'typed') : settings.mode;
   const avoid = new Set(recent);
-  if (mode === 'meaning') return meaningQuestion(regional, level, rng, avoid);
+  const regional = verbs.filter((v) => verbInRegion(v, region));
+  if (scope === 'review') return reviewQuestion({ deck, verbs, vocab, region, mode, rng, avoid });
+  if (scope === 'meanings') return meaningQuestion(regional, level, mode, rng, avoid);
+  if (scope === 'vocab' || scope.startsWith('topic:')) {
+    const topic = scope.startsWith('topic:') ? scope.slice(6) : null;
+    if (!vocab.items.length) throw new NoQuestion('no vocabulary loaded');
+    return vocabQuestion({ items: vocab.items, settings, level, mode, rng, avoid, topic });
+  }
+  if (scope.startsWith('cat:')) return categoryQuestion(scope.slice(4), { verbs, region, level, mode, rng, avoid });
 
   for (let attempt = 0; attempt < 50; attempt++) {
-    const tenseId = chooseTense(settings.scope, level, rng);
+    const tenseId = chooseTense(scope, level, rng);
     const verb = chooseVerb(regional, level, TENSE_BY_ID[tenseId].level, rng, avoid);
     const persons = personsFor(verb, tenseId, region);
     if (persons.length === 0) continue; // e.g. commands of an impersonal verb
-    const person = pick(persons, rng);
-    const { table } = tables(verb);
-    const answer = table[tenseId][person ?? 0];
-    const q = {
-      kind: 'conj',
-      mode,
-      verb,
-      tense: tenseId,
-      person,
-      answer,
-      accepted: accepted(answer),
-      level: LEVELS[Math.max(lvl(verb.level), lvl(TENSE_BY_ID[tenseId].level))],
-      region: questionRegion(verb, person),
-      audience: region, // the learner's region setting
-    };
-    if (mode === 'mc') q.options = conjugationOptions(q, rng);
-    return q;
+    return conjQuestionFor({ verb, tense: tenseId, person: pick(persons, rng), mode, region, rng });
   }
-  throw new Error(`no question available for ${settings.scope} at ${level}`);
+  throw new NoQuestion(`${scope} at ${level}`);
+}
+
+/** A conjugation question for one cell of a verb's table. */
+export function conjQuestionFor({ verb, tense, person, mode, region, rng }) {
+  const answer = tables(verb).table[tense][person ?? 0];
+  const q = {
+    kind: 'conj',
+    mode,
+    verb,
+    tense,
+    person,
+    answer,
+    accepted: accepted(answer),
+    level: LEVELS[Math.max(lvl(verb.level), lvl(TENSE_BY_ID[tense].level))],
+    region: questionRegion(verb, person),
+    audience: region, // the learner's region setting
+    key: `conj|${verb.inf}|${tense}|${person}`,
+    spec: { kind: 'conj', inf: verb.inf, tense, person },
+  };
+  if (mode === 'mc') q.options = conjugationOptions(q, rng);
+  return q;
+}
+
+// The thing a question is about, for avoiding repeats.
+export const subjectOf = (q) => (q.kind === 'vocab' ? q.item.id : q.verb.inf);
+
+// ---------------------------------------------------------------------------
+// Practicing one review category (e.g. irregular preterite stems)
+
+const categoryCache = new Map();
+
+/** Every table cell whose form exercises `category`, as { verb, tense, person }. */
+export function cellsForCategory(category, verbs, region) {
+  const key = `${category}|${region}|${verbs.length}`;
+  if (categoryCache.has(key)) return categoryCache.get(key);
+  const cells = [];
+  for (const verb of verbs) {
+    if (!verbInRegion(verb, region)) continue;
+    const { table } = tables(verb);
+    for (const t of TENSES) {
+      for (const person of personsFor(verb, t.id, region)) {
+        const f = table[t.id][person ?? 0];
+        if (conjCategories(t.id, person, f).includes(category)) cells.push({ verb, tense: t.id, person });
+      }
+    }
+  }
+  categoryCache.set(key, cells);
+  return cells;
+}
+
+function categoryQuestion(category, { verbs, region, level, mode, rng, avoid }) {
+  // vosotros can only be practiced with Spain's forms
+  let cells = cellsForCategory(category, verbs, region);
+  if (!cells.length && region === 'mx') cells = cellsForCategory(category, verbs, 'both');
+  if (!cells.length) throw new NoQuestion(`category ${category}`);
+  const atLevel = cells.filter((c) => lvl(c.verb.level) <= lvl(level) && lvl(TENSE_BY_ID[c.tense].level) <= lvl(level));
+  const pool = atLevel.length ? atLevel : cells;
+  const fresh = pool.filter((c) => !avoid.has(c.verb.inf));
+  const cell = pick(fresh.length ? fresh : pool, rng);
+  return conjQuestionFor({ ...cell, mode, region, rng });
+}
+
+// ---------------------------------------------------------------------------
+// The mistakes deck
+
+function reviewQuestion({ deck, verbs, vocab, region, mode, rng, avoid }) {
+  const byInf = new Map(verbs.map((v) => [v.inf, v]));
+  const byId = new Map(vocab.items.map((i) => [i.id, i]));
+  const usable = deck.filter((d) => (d.spec.kind === 'vocab' ? byId.has(d.spec.id) : byInf.has(d.spec.inf)));
+  if (!usable.length) throw new NoQuestion('review-empty');
+  const fresh = usable.filter((d) => !avoid.has(d.spec.inf ?? d.spec.id));
+  const { spec } = pick(fresh.length ? fresh : usable, rng);
+  if (spec.kind === 'conj') {
+    return conjQuestionFor({ verb: byInf.get(spec.inf), tense: spec.tense, person: spec.person, mode, region, rng });
+  }
+  if (spec.kind === 'meaning') {
+    return meaningQuestionFor({ verb: byInf.get(spec.inf), direction: spec.direction, mode, verbs, rng });
+  }
+  return vocabQuestionFor({ item: byId.get(spec.id), dir: spec.dir, region: spec.region, mode, items: vocab.items, rng });
 }
 
 // ---------------------------------------------------------------------------
@@ -253,11 +345,31 @@ export function glossesOverlap(a, b) {
   return senses(b).some((s) => sa.has(s));
 }
 
-function meaningQuestion(verbs, level, rng, avoid) {
+function meaningQuestion(verbs, level, mode, rng, avoid) {
   const pool = verbs.filter((v) => lvl(v.level) <= lvl(level));
   const fresh = pool.filter((v) => !avoid.has(v.inf));
   const verb = weightedPick(fresh.length ? fresh : pool, (v) => (v.level === level ? 3 : 1), rng);
-  const direction = rng() < 0.5 ? 'es-en' : 'en-es';
+  // English is too loose to grade when typed, so typed answers are always Spanish.
+  const direction = mode === 'typed' || rng() < 0.5 ? 'en-es' : 'es-en';
+  return meaningQuestionFor({ verb, direction, mode, verbs, rng });
+}
+
+/** What a verb means: es-en (pick the English) or en-es (pick or type the infinitive). */
+export function meaningQuestionFor({ verb, direction, mode, verbs, rng }) {
+  const text = (v) => (direction === 'es-en' ? v.en : v.inf);
+  const q = {
+    kind: 'meaning',
+    mode: direction === 'es-en' ? 'mc' : mode,
+    direction,
+    verb,
+    answer: { form: text(verb), alts: [], tags: [] },
+    accepted: [text(verb)],
+    level: verb.level,
+    region: verb.regions?.length === 1 ? verb.regions[0] : null,
+    key: `meaning|${verb.inf}|${direction}`,
+    spec: { kind: 'meaning', inf: verb.inf, direction },
+  };
+  if (q.mode !== 'mc') return q;
   const near = verbs.filter(
     (v) => v.inf !== verb.inf && Math.abs(lvl(v.level) - lvl(verb.level)) <= 1 && !glossesOverlap(v.en, verb.en),
   );
@@ -266,22 +378,11 @@ function meaningQuestion(verbs, level, rng, avoid) {
     if (chosen.every((c) => !glossesOverlap(c.en, v.en))) chosen.push(v);
     if (chosen.length === 3) break;
   }
-  const text = (v) => (direction === 'es-en' ? v.en : v.inf);
-  const options = shuffle(
+  q.options = shuffle(
     [{ text: text(verb), correct: true }, ...chosen.map((v) => ({ text: text(v), correct: false, why: { kind: 'meaning', verb: v } }))],
     rng,
   );
-  return {
-    kind: 'meaning',
-    mode: 'mc',
-    direction,
-    verb,
-    options,
-    answer: { form: text(verb), alts: [], tags: [] },
-    accepted: [text(verb)],
-    level: verb.level,
-    region: verb.regions?.length === 1 ? verb.regions[0] : null,
-  };
+  return q;
 }
 
 // ---------------------------------------------------------------------------
@@ -322,6 +423,13 @@ export function locateForm(entry, form) {
  * `why` describes a wrong answer that is another form of the same verb.
  */
 export function gradeTyped(q, input, { strict = false } = {}) {
+  if (q.kind === 'vocab') return gradeVocab(q, input, { strict, normalize: normalizeAnswer, plain });
+  if (q.kind === 'meaning') {
+    const s = normalizeAnswer(input);
+    if (q.accepted.includes(s)) return { result: 'correct', typed: s };
+    const match = !strict && q.accepted.find((a) => plain(a) === plain(s));
+    return match ? { result: 'accent', expected: match, typed: s } : { result: 'wrong', typed: s };
+  }
   let s = normalizeAnswer(input).replace(SUBJECT, '');
   if (q.tense === 'imp_neg' && !s.startsWith('no ')) s = `no ${s}`;
   if (q.accepted.includes(s)) return { result: 'correct' };

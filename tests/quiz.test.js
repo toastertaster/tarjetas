@@ -101,7 +101,7 @@ test('regularized form is offered as a trap for irregular verbs', () => {
 test('meaning questions never offer two options with the same sense', () => {
   const rng = seededRng(9);
   for (let i = 0; i < 500; i++) {
-    const q = makeQuestion({ verbs, settings: { mode: 'meaning', scope: 'verbs', region: 'both' }, level: 'C2', rng });
+    const q = makeQuestion({ verbs, settings: { mode: 'mc', scope: 'meanings', region: 'both' }, level: 'C2', rng });
     assert.equal(q.options.length, 4);
     const glosses = q.options.map((o) => (q.direction === 'es-en' ? o.text : verbs.find((v) => v.inf === o.text).en));
     for (let a = 0; a < 4; a++) {
