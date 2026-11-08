@@ -257,6 +257,11 @@ select:disabled {
   background: var(--card);
 }
 
+/* A fixed box, so "Review" / "Repaso" don't change the header's width. */
+.review-btn .label {
+  min-width: 4em;
+}
+
 .review-btn .count {
   min-width: 1.3rem;
   padding: 0 0.35rem;
