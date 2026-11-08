@@ -1,9 +1,14 @@
 {
   "name": "tarjetas",
   "private": true,
+  "description": "Spanish flash cards. The site itself has no dependencies; Playwright is only used to test how the pages render.",
   "type": "module",
-  "description": "Spanish flash-card quizzes. No dependencies: the site is static and tests use node --test.",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "test:render": "playwright test",
+    "test:render:update": "playwright test --update-snapshots"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0"
   }
 }

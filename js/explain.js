@@ -5,6 +5,7 @@ import { analyze, TENSE_BY_ID } from './conjugate.js';
 import { VOSOTROS, tables } from './quiz.js';
 import { formsFor, genderOf, isRegional, splitArticle } from './vocab.js';
 import { filledSentence } from './phrases.js';
+import { englishForm } from './english.js';
 
 // Engine tags with no note of their own (the tense rule already covers them).
 export const SILENT_TAGS = new Set(['subj-from-yo']);
@@ -100,6 +101,42 @@ function grammarNotes(q) {
   const notes = [{ key: 'example', es: filledSentence(item), en: item.en }, { key: 'grammar-why', why: item.why }];
   if (item.region) notes.push({ key: 'phrase-region', region: item.region });
   return notes;
+}
+
+/**
+ * What one multiple-choice option means, shown on every option once the
+ * answer is revealed, so all four can be compared:
+ *   { text, lang } – the meaning (English for Spanish options and vice versa)
+ *   { invented: true } – a form that doesn't exist (tení, no levántate)
+ *   null – nothing useful to add (grammar choices like es / está)
+ */
+export function optionMeaning(q, o) {
+  const why = o.why ?? {};
+  switch (q.kind) {
+    case 'conj':
+    case 'sentence': {
+      if (o.correct) return { text: englishForm(q.verb, q.tense, q.person), lang: 'en' };
+      if (why.kind === 'person' || why.kind === 'tense') {
+        return { text: englishForm(q.verb, why.tense ?? q.tense, why.person ?? null), lang: 'en' };
+      }
+      return { invented: true };
+    }
+    case 'meaning': {
+      const verb = o.correct ? q.verb : why.verb;
+      return q.direction === 'es-en' ? { text: verb.inf, lang: 'es' } : { text: verb.en, lang: 'en' };
+    }
+    case 'vocab': {
+      const item = o.correct ? q.item : why.item;
+      return q.dir === 'es-en' ? { text: formsFor(item, q.vocabRegion).form, lang: 'es' } : { text: item.en, lang: 'en' };
+    }
+    case 'idiom': {
+      const item = o.correct ? q.item : why.item;
+      return q.dir === 'es-en' ? { text: item.es, lang: 'es' } : { text: item.en, lang: 'en' };
+    }
+    case 'conversation':
+      return { text: o.correct ? q.item.answer.en : why.en, lang: 'en' };
+  }
+  return null;
 }
 
 const firstLetter = (s) => s.replace(/^[¡¿]/, '')[0];
