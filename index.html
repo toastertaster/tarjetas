@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tarjetas — Spanish flash cards</title>
+    <meta name="description" content="Keyboard-friendly Spanish flash cards: verb conjugations for Mexican and Spain Spanish." />
+    <link rel="icon" href="img/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <script type="module" src="js/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <h1 class="brand">Tarjetas</h1>
+      <div class="controls">
+        <label><span data-i18n="mode">Mode</span><select id="mode"></select></label>
+        <label><span data-i18n="scope">Scope</span><select id="scope"></select></label>
+        <label><span data-i18n="level">Level</span><select id="level"></select></label>
+        <label><span data-i18n="region">Region</span><select id="region"></select></label>
+      </div>
+      <div class="status">
+        <span class="score" id="score" aria-live="polite"></span>
+        <div class="lang" role="group" aria-label="Language / Idioma">
+          <button type="button" data-lang="en" title="English"><img src="img/flags/us.svg" alt="English" width="28" height="18" /></button>
+          <button type="button" data-lang="es" title="Español"><img src="img/flags/mx.svg" alt="Español" width="28" height="18" /></button>
+        </div>
+        <button type="button" class="help-btn" id="help-btn" data-i18n-title="help" title="Keyboard shortcuts">?</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="card-stage">
+        <div class="card" id="card">
+          <section class="face" data-face="0"><p class="loading" data-i18n="loading">Loading…</p></section>
+          <section class="face back" data-face="1" inert></section>
+        </div>
+      </div>
+      <section class="feedback" id="feedback" aria-live="polite" hidden></section>
+      <div class="toast" id="toast" role="status" hidden></div>
+    </main>
+
+    <footer class="footer" id="footer"></footer>
+
+    <dialog id="help">
+      <h2 data-i18n="keys.title">Keyboard shortcuts</h2>
+      <table>
+        <tr><td><kbd>1</kbd>–<kbd>4</kbd></td><td data-i18n="keys.options"></td></tr>
+        <tr><td><kbd>Enter</kbd></td><td data-i18n="keys.enter"></td></tr>
+        <tr><td><kbd>Esc</kbd></td><td data-i18n="keys.esc"></td></tr>
+        <tr><td><kbd>H</kbd></td><td data-i18n="keys.hint"></td></tr>
+        <tr><td><kbd>Alt</kbd>+<kbd>H</kbd> / <kbd>⌥</kbd><kbd>H</kbd></td><td data-i18n="keys.hintTyped"></td></tr>
+        <tr><td><kbd>?</kbd></td><td data-i18n="keys.help"></td></tr>
+      </table>
+      <p data-i18n="keys.accents"></p>
+      <form method="dialog"><button data-i18n="close">Close</button></form>
+    </dialog>
+  </body>
+</html>

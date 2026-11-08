@@ -1,0 +1,12 @@
+{
+  "packs": [
+    {
+      "id": "verbs",
+      "kind": "verbs",
+      "file": "verbs.json",
+      "title": "Core verbs",
+      "source": "Written for tarjetas",
+      "license": "MIT"
+    }
+  ]
+}
