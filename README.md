@@ -14,7 +14,7 @@ The dropdowns along the top choose what you practice:
 | Dropdown | Options |
 |---|---|
 | Mode | How you answer: multiple choice, type the answer, or mixed |
-| Scope | What you practice: verbs in all tenses or one tense, verb meanings, verbs in real sentences, vocabulary (all topics or one), idioms, conversation (all situations or one), grammar (all topics or one), your mistakes |
+| Scope | What you practice: verbs in all tenses or one tense, verb meanings, verbs in real sentences, recognizing conjugated verbs, vocabulary (all topics or one), idioms, conversation (all situations or one), listening, grammar (all topics or one), your mistakes |
 | Level | Auto, or a fixed CEFR level A1–C2 |
 | Region | Mexico (default), Spain, or both. *Vosotros*, and words, idioms and phrases marked for one country, appear only with that country or Both; Both also asks Mexico ↔ Spain equivalents (*carro* → *coche*). |
 
@@ -28,6 +28,7 @@ the settings fold away behind the ⚙ button.
 | `Esc` | Skip to the next card (not scored) |
 | `A` (`Alt+A` / `⌥A` while typing) | Show the answer (not scored) |
 | `H` (`Alt+H` / `⌥H` while typing) | Hint; press again for more help |
+| `S` (`Alt+S` / `⌥S` while typing) | Hear the card's Spanish read aloud |
 | `?` | Keyboard help |
 
 Each card reads top to bottom: the Spanish word or sentence in large type,
@@ -35,7 +36,22 @@ then what it means and a **Sounds like** pronunciation guide written in
 English spelling with the stressed syllable in capitals (*tener* → *teh-NEHR*;
 with Region set to Spain, *c* and *z* sound like *th*), then the task in bold
 (*Conjugate it for **yo** in the **preterite***), then the answers. The guide
-is rule-based, so treat it as an approximation.
+is rule-based, so treat it as an approximation. The 🔊 button next to it
+(or `S`) reads the word aloud with the device's own Spanish voice, Mexican or
+Spain's to match the Region. Which voices exist depends on the device and
+browser; without a Spanish one, a message says so.
+
+**Recognize conjugated verbs** turns conjugation around: it shows a form
+(*tuvimos*) and asks which verb, person and tense it is (*tener · nosotros ·
+Preterite*). Forms that could be two things (*fue*: ser or ir; *hablamos*:
+present or preterite) are never asked, and a form shared by several persons
+names them all (*hablaba*: yo or él / ella / usted). The wrong options are
+another person, another tense and a verb that starts the same way.
+
+**Listening** plays a Tatoeba sentence (🔊 *Listen*, 🐢 *Slower*) and asks
+what it means; it plays by itself once you have clicked or typed on the page,
+and the hint shows the sentence in writing. It appears only on devices that
+can speak.
 
 **Verbs in real sentences** shows a sentence written by a native speaker with
 its verb blanked out, plus the infinitive, the tense and an English
@@ -51,11 +67,15 @@ verb mean?* the hint shows the verb in a short real sentence from Tatoeba
 (*Él **sacó** una foto*), chosen so its translation uses the meaning being
 asked, and the translation comes with the answer. Verbs without one (about a
 quarter, mostly B2–C2) get the first letter of their English meaning instead.
+Vocabulary asked Spanish to English works the same way (*¡Te lavaré la boca
+con **jabón**!*), when Tatoeba has a sentence with the word.
 
 After a miss (or *Show answer*), every multiple-choice option shows what it means,
 so all four can be compared: *tuve — I had*, *tenía — I used to have*,
 *tuvo — he/she had*, and *tení — not a real form*. For vocabulary, idioms and
-conversation the options show their translations.
+conversation the options show their translations. A missed conjugation also
+shows the whole tense of that verb, singular persons on the left and plural
+on the right, with the answer highlighted.
 
 When typing, `a'` becomes `á`, `n~` becomes `ñ` and `u"` becomes `ü`. A
 missing accent counts as correct with a reminder, unless *Strict accents* is
@@ -103,8 +123,10 @@ pixel density, touch and browser identity of each phone, not a real device.
 
 - `layout.spec.js` checks rules that must always hold: the header keeps its
   size when the language changes (at every desktop width), images keep their
-  proportions, nothing sticks out of the card or the screen, and every option
-  is explained after a miss.
+  proportions, nothing sticks out of the card or the screen, every option
+  is explained after a miss, and the read-aloud buttons say the right text.
+  Speech is replaced by a silent stand-in with the same voices in every
+  browser.
 - `screens.spec.js` takes screenshots of the main screens (cards of each kind,
   the Spanish page, a missed card, the review page, phone settings) and
   compares them with the approved images in `tests/visual/snapshots/`.
@@ -165,6 +187,7 @@ engine or verb list changes.
 | `js/phrases.js` | Idiom, conversation and grammar questions |
 | `js/pronounce.js` | The "Sounds like" guide: respells Spanish in English spelling, stressed syllable in capitals |
 | `js/english.js` | English meanings of verb forms (*tuve — I had*), shown on the options after a miss |
+| `js/speech.js` | Reads Spanish aloud with the browser's voices (Web Speech API), choosing a Mexican or Spain voice |
 | `js/random.js` | Seeded randomness and level-weighted picking shared by every kind of question |
 | `js/review.js` | Maps questions to review topics, tracks misses, keeps the mistakes deck |
 | `js/explain.js` | Turns a question and a wrong answer into explanation and hint notes |

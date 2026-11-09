@@ -50,6 +50,30 @@ test('verb meaning card with its hint', async ({ page }) => {
   await shot(page, 'meaning-hint');
 });
 
+test('vocabulary card with its hint: the word in a real sentence', async ({ page }) => {
+  await openApp(page, { settings: { scope: 'vocab' } });
+  await cardWhere(page, async (p) => {
+    if (!(await face(p).locator('.verb[lang=es]').count())) return false;
+    await p.keyboard.press('h');
+    await expect(face(p).locator('.hint-box')).toBeVisible();
+    return (await face(p).locator('.hint-box a').count()) > 0;
+  });
+  await shot(page, 'vocab-hint');
+});
+
+test('recognize card, answer shown with the whole tense', async ({ page }) => {
+  await openApp(page, { settings: { scope: 'recognize' } });
+  await showAnswer(page);
+  await shot(page, 'recognize-answer');
+});
+
+test('listening card with its hint', async ({ page }) => {
+  await openApp(page, { settings: { scope: 'listening' } });
+  await page.keyboard.press('h');
+  await expect(face(page).locator('.hint-box')).toBeVisible();
+  await shot(page, 'listening-hint');
+});
+
 test('idiom card', async ({ page }) => {
   await openApp(page, { settings: { scope: 'idioms' } });
   await shot(page, 'idiom');

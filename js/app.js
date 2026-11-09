@@ -3,10 +3,12 @@
 // vocab.js, explain.js and review.js.
 
 import { TENSES, LEVELS, analyze } from './conjugate.js';
-import { makeQuestion, gradeTyped, scoreFor, subjectOf, NoQuestion, MODES, REGIONS } from './quiz.js';
+import { makeQuestion, gradeTyped, scoreFor, subjectOf, tables, rawTables, personsFor, NoQuestion, MODES, REGIONS } from './quiz.js';
+import { formsFor } from './vocab.js';
+import { canSpeak, speak, stopSpeaking, RATE, SLOW_RATE } from './speech.js';
 import { emptyPhrases } from './phrases.js';
 import { respell } from './pronounce.js';
-import { explanationNotes, hintNotes, noteContext, reveal, optionMeaning, exampleFor } from './explain.js';
+import { explanationNotes, hintNotes, noteContext, reveal, optionMeaning, exampleFor, wordExampleFor } from './explain.js';
 import { needsReview, scopeFor } from './review.js';
 import {
   t,
@@ -21,6 +23,8 @@ import {
   categoryTipHtml,
   exampleHtml,
   tatoebaCredit,
+  readingHtml,
+  tenseName,
 } from './i18n.js';
 import { Progress } from './progress.js';
 
@@ -82,8 +86,13 @@ function buildControls() {
     g.append(...options);
     return g;
   };
-  const verbScopes = [option('verbs', T('scope.verbs'), s.scope), option('meanings', T('scope.meanings'), s.scope)];
-  if (state.packs.some((p) => p.kind === 'sentences')) verbScopes.push(option('sentences', T('scope.sentences'), s.scope));
+  const verbScopes = [
+    option('verbs', T('scope.verbs'), s.scope),
+    option('meanings', T('scope.meanings'), s.scope),
+    option('recognize', T('scope.recognize'), s.scope),
+  ];
+  const hasSentences = state.packs.some((p) => p.kind === 'sentences');
+  if (hasSentences) verbScopes.push(option('sentences', T('scope.sentences'), s.scope));
   scope.replaceChildren(group(T('group.verbs'), verbScopes));
   for (const mood of ['indicative', 'subjunctive', 'imperative', 'nonfinite']) {
     const tenses = TENSES.filter((x) => x.mood === mood);
@@ -108,6 +117,7 @@ function buildControls() {
       ]),
     );
   }
+  if (hasSentences && canSpeak()) scope.append(group(T('group.listening'), [option('listening', T('scope.listening'), s.scope)]));
   if (grammar.length) {
     scope.append(
       group(T('group.grammar'), [
@@ -180,7 +190,11 @@ function flag(region) {
 }
 
 // The language of the options and the answer.
-const answerLang = (q) => q.optionLang ?? (q.direction === 'es-en' || q.dir === 'es-en' ? 'en' : 'es');
+const answerLang = (q) => {
+  if (q.optionLang) return q.optionLang;
+  if (q.kind === 'recognize') return lang(); // "tener · nosotros · Preterite"
+  return q.direction === 'es-en' || q.dir === 'es-en' || q.kind === 'listen' ? 'en' : 'es';
+};
 
 // Every card reads top to bottom: what the card is about (big), what helps
 // to understand it (meaning, pronunciation, translation), then the task in
@@ -196,9 +210,18 @@ const tenseInTask = (id) => {
   return label[0].toLowerCase() + label.slice(1);
 };
 
-// The pronunciation guide (hablar → ah-BLAHR), with Spain's "th" when practicing Spain's Spanish.
+// A button that reads Spanish aloud (in the region's accent), on devices that can.
+function speakBtn(text, region, { label = '', slow = false, cls = '' } = {}) {
+  if (!canSpeak()) return '';
+  const name = label || T('listen');
+  return `<button type="button" class="speak-btn${cls}" data-say="${esc(text)}" data-region="${esc(region)}"${slow ? ' data-slow' : ''}
+    title="${esc(name)} (S)" aria-label="${esc(name)}">${slow ? '🐢' : '🔊'}${label ? ` ${esc(label)}` : ''}</button>`;
+}
+
+// The pronunciation guide (hablar → ah-BLAHR), with Spain's "th" when
+// practicing Spain's Spanish, and a button to hear it.
 function say(text, region = progress.settings.region) {
-  return `<p class="say">${esc(T('say'))} <span class="sounds">${esc(respell(text, region))}</span></p>`;
+  return `<p class="say">${esc(T('say'))} <span class="sounds">${esc(respell(text, region))}</span> ${speakBtn(text, region)}</p>`;
 }
 
 function blanked(text, [start, end]) {
@@ -242,27 +265,41 @@ function promptHtml(q) {
       return q.dir === 'es-en'
         ? subject(q.prompt, 'es', ' phrase') + say(q.prompt) + task(esc(T('prompt.idiom.es-en')))
         : subject(q.prompt, 'en', ' phrase') + task(esc(T('prompt.idiom.en-es')));
-    case 'conversation':
-      return subject(q.prompt, 'es', ' phrase speech') + task(esc(T('prompt.conversation')));
+    case 'conversation': {
+      const listen = speakBtn(q.prompt, progress.settings.region);
+      return subject(q.prompt, 'es', ' phrase speech') + (listen ? `<p class="say">${listen}</p>` : '') + task(esc(T('prompt.conversation')));
+    }
+    case 'recognize':
+      return subject(q.form, 'es') + say(q.form) + task(esc(T('prompt.recognize')));
+    case 'listen': {
+      const region = progress.settings.region;
+      const buttons = speakBtn(q.item.es, region, { label: T('listen'), cls: ' play' }) + speakBtn(q.item.es, region, { label: T('listenSlow'), slow: true, cls: ' play' });
+      return `<div class="listen-box">${buttons}</div>` + task(esc(T('prompt.listen')));
+    }
     case 'grammar':
       return blanked(q.item.es, [q.item.es.indexOf('___'), q.item.es.indexOf('___') + 3]) + helper(q.item.en) + task(esc(T('prompt.grammar')));
   }
   return '';
 }
 
-// Below the answers: the credit for a Tatoeba sentence.
+// Below the answers: the credit for a Tatoeba sentence (a listening card's
+// comes with its answer).
 const creditHtml = (q) => (q.kind === 'sentence' ? `<p class="credit">${tatoebaCredit(lang(), q.item)}</p>` : '');
+
+const optionHtml = (q, o) => (q.kind === 'recognize' ? readingHtml(lang(), o.reading) : esc(o.text));
 
 function answerHtml(q, id) {
   if (q.mode === 'mc') {
     const textLang = answerLang(q);
+    // Readings (verb · person · tense) are compared part by part: one per line.
+    const wide = q.kind === 'recognize' ? ' wide' : '';
     const items = q.options
       .map(
         (o, i) => `<li><button type="button" class="option" data-i="${i}">
-          <kbd>${i + 1}</kbd><span lang="${textLang}">${esc(o.text)}</span><span class="mark" aria-hidden="true"></span></button></li>`,
+          <kbd>${i + 1}</kbd><span lang="${textLang}">${optionHtml(q, o)}</span><span class="mark" aria-hidden="true"></span></button></li>`,
       )
       .join('');
-    return `<ol class="options">${items}</ol>`;
+    return `<ol class="options${wide}">${items}</ol>`;
   }
   return `
     <form class="typed" novalidate>
@@ -290,6 +327,10 @@ function chipText(q) {
       return name(state.phrases.situations[q.situation]);
     case 'grammar':
       return name(state.phrases.grammarSets[q.set]);
+    case 'recognize':
+      return T('chip.recognize');
+    case 'listen':
+      return T('group.listening');
   }
   return T('scope.meanings');
 }
@@ -317,6 +358,7 @@ function renderFace(face, q) {
   $('.hint-btn', face).addEventListener('click', hint);
   $('.skip-btn', face).addEventListener('click', skip);
   $('.answer-btn', face).addEventListener('click', showAnswer);
+  for (const b of $$('.speak-btn', face)) b.addEventListener('click', () => speakFrom(b));
   const form = $('.typed', face);
   if (form) {
     const input = $('input[type=text]', form);
@@ -400,6 +442,7 @@ function focusAnswer(face) {
 
 // Draw the next question on the hidden face and turn the card over.
 function flipToNext() {
+  stopSpeaking();
   hideFeedback();
   state.q = newQuestion();
   state.hintLevel = 0;
@@ -421,6 +464,9 @@ function flipToNext() {
   }
   state.phase = 'answering';
   focusAnswer(to);
+  // A listening card plays its sentence straight away, once the page may
+  // make sound (browsers wait for a first click or key press).
+  if (state.q.kind === 'listen' && navigator.userActivation?.hasBeenActive !== false) speakCard();
 }
 
 // Replace the current card without flipping (first load, language change).
@@ -447,6 +493,17 @@ function submitTyped(value) {
   const grade = gradeTyped(state.q, value, { strict: progress.settings.strict });
   if (grade.result === 'wrong') fail({ kind: 'wrong', grade });
   else succeed(grade.result, { grade });
+}
+
+function speakFrom(button) {
+  const rate = 'slow' in button.dataset ? SLOW_RATE : RATE;
+  if (!speak(button.dataset.say, { region: button.dataset.region, rate })) toast(T('noVoice'));
+}
+
+// S: hear the card's Spanish (the first listen button).
+function speakCard() {
+  const button = $('.speak-btn', currentFace());
+  if (button) speakFrom(button);
 }
 
 // Skip: straight to the next card, as if this one never came up.
@@ -550,16 +607,38 @@ async function hint() {
     const wrong = q.options.filter((o) => !o.correct && !o.eliminated);
     for (let n = removable(q); n > 0 && wrong.length; n--) wrong.splice(Math.floor(Math.random() * wrong.length), 1)[0].eliminated = true;
   }
-  // Verb meaning hints use an example sentence, which may still be loading.
-  if (q.kind === 'meaning' && state.sentences === null) {
+  // Meaning and vocabulary hints use an example sentence, which may still be loading.
+  if ((q.kind === 'meaning' || q.kind === 'vocab') && state.sentences === null) {
     await loadSentences().catch(() => {});
     if (state.q !== q || state.phase !== 'answering') return;
   }
   renderHints(currentFace());
 }
 
-// A real sentence using the verb of a meaning question, once the sentences are loaded.
-const exampleOf = (q) => (q.kind === 'meaning' && state.sentences ? exampleFor(q.verb, state.sentences, progress.settings.region) : null);
+// A real sentence using the verb or word being asked, once the sentences are loaded.
+function exampleOf(q) {
+  if (!state.sentences) return null;
+  const region = progress.settings.region;
+  if (q.kind === 'meaning') return exampleFor(q.verb, state.sentences, region);
+  if (q.kind === 'vocab') return wordExampleFor(q.item, formsFor(q.item, q.vocabRegion).form, state.sentences, region);
+  return null;
+}
+
+// The whole tense after a conjugation is missed or shown, the answer
+// highlighted: singular persons on the left, plural on the right.
+function tableHtml(q) {
+  if (!['conj', 'sentence', 'recognize'].includes(q.kind) || q.person === null) return '';
+  const { table } = q.kind === 'sentence' ? rawTables(q.verb) : tables(q.verb);
+  const shown = new Set(personsFor(q.verb, q.tense, q.audience ?? progress.settings.region));
+  const answer = new Set(q.persons ?? [q.person]);
+  const cells = [0, 1, 2, 3, 4, 5].map((p) => {
+    if (!shown.has(p)) return '<div class="cell empty"></div>';
+    const who = esc(personLabel(q.tense, p));
+    return `<div class="cell${answer.has(p) ? ' hl' : ''}"><span class="who">${who}</span> <b lang="es">${esc(table[q.tense][p].form)}</b></div>`;
+  });
+  const title = T('table.title', { inf: bold(q.verb.inf, 'es'), tense: esc(tenseName(lang(), q.tense).toLowerCase()) });
+  return `<figure class="conj-table"><figcaption>${title}</figcaption><div class="cells">${cells.join('')}</div></figure>`;
+}
 
 function renderHints(face) {
   const q = state.q;
@@ -596,8 +675,9 @@ function renderFeedback() {
   panel.classList.toggle('shown', o.kind === 'shown');
   panel.innerHTML = `
     <h2>${esc(o.kind === 'shown' ? T('shown') : `✗ ${T('wrong')}`)}</h2>
-    <p class="answer">${T('answerIs', { answer: `<b lang="${answerLang(q)}">${esc(q.answer.form)}</b>` })}</p>
+    <p class="answer">${T('answerIs', { answer: `<b lang="${answerLang(q)}">${q.kind === 'recognize' ? readingHtml(lang(), q.reading) : esc(q.answer.form)}</b>` })}</p>
     ${alts}
+    ${tableHtml(q)}
     <ul>${notes.map((n) => `<li>${n}</li>`).join('')}</ul>
     <footer><span>${esc(T('continue'))}</span><button type="button" class="next-btn">${esc(T('next'))} ↵</button></footer>`;
   panel.hidden = false;
@@ -717,11 +797,11 @@ function onKeyDown(e) {
     return;
   }
   if (e.target.matches?.('select')) return;
-  // Alt+H / Alt+A also work while typing, where H and A are letters.
-  if (e.altKey && (e.code === 'KeyH' || e.code === 'KeyA')) {
+  // Alt+H / Alt+A / Alt+S also work while typing, where H, A and S are letters.
+  const altAction = { KeyH: hint, KeyA: showAnswer, KeyS: speakCard }[e.code];
+  if (e.altKey && altAction) {
     e.preventDefault();
-    if (e.code === 'KeyH') hint();
-    else showAnswer();
+    altAction();
     return;
   }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -748,6 +828,9 @@ function onKeyDown(e) {
   } else if (e.key === 'a' || e.key === 'A') {
     e.preventDefault();
     showAnswer();
+  } else if (e.key === 's' || e.key === 'S') {
+    e.preventDefault();
+    speakCard();
   } else if (e.key === '?') {
     e.preventDefault();
     $('#help').showModal();
@@ -837,10 +920,13 @@ function loadSentences() {
 }
 
 const deckHas = (kind) => progress.settings.scope === 'review' && progress.review.deck.some((d) => d.spec.kind === kind);
-// Sentence cards can't be made without the sentences.
-const needsSentences = () => progress.settings.scope === 'sentences' || deckHas('sentence');
-// Verb meaning cards use them for hints and explanations, so they load in the background.
-const usesSentences = () => progress.settings.scope === 'meanings' || deckHas('meaning');
+// Sentence and listening cards can't be made without the sentences.
+const needsSentences = () => ['sentences', 'listening'].includes(progress.settings.scope) || deckHas('sentence') || deckHas('listen');
+// Verb meaning and vocabulary cards use them for hints and explanations, so they load in the background.
+const usesSentences = () => {
+  const { scope } = progress.settings;
+  return scope === 'meanings' || scope === 'vocab' || scope.startsWith('topic:') || deckHas('meaning') || deckHas('vocab');
+};
 
 /**
  * Load what the current scope needs before the next card. Resolves to false
@@ -854,7 +940,7 @@ async function ensureContent() {
     } catch (err) {
       console.error(err);
       toast(T('loadSentencesError'));
-      if (progress.settings.scope === 'sentences') progress.set('scope', 'verbs');
+      if (['sentences', 'listening'].includes(progress.settings.scope)) progress.set('scope', 'verbs');
       buildControls();
     }
   } else if (state.sentences === null && usesSentences()) {

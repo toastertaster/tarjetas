@@ -29,12 +29,15 @@ const UI = {
     'scope.review': 'My mistakes ({n})',
     'scope.cat': 'Review: {label}',
     'scope.sentences': 'Verbs in real sentences',
+    'scope.recognize': 'Recognize conjugated verbs',
+    'scope.listening': 'Listen to real sentences',
     'scope.idioms': 'Idioms & expressions',
     'scope.conversation': 'Conversation: all situations',
     'scope.grammar': 'Grammar: all topics',
     'group.verbs': 'Verbs',
     'group.vocab': 'Vocabulary topics',
     'group.phrases': 'Idioms & conversation',
+    'group.listening': 'Listening',
     'group.grammar': 'Grammar',
     'group.review': 'Review',
     'mood.indicative': 'Indicative',
@@ -81,6 +84,13 @@ const UI = {
     'prompt.idiom.en-es': 'Which expression means this?',
     'prompt.conversation': 'What is the best reply?',
     'prompt.grammar': 'Which word fills the blank?',
+    'prompt.recognize': 'Which verb, person and tense is this?',
+    'chip.recognize': 'Recognize',
+    'prompt.listen': 'What does it mean?',
+    listen: 'Listen',
+    listenSlow: 'Slower',
+    noVoice: 'This device has no Spanish voice to read aloud with.',
+    'table.title': '{inf} in the {tense}',
     'credit.sentence': 'Sentence {link} by {by}',
     'credit.translation': 'translation {link} by {by}',
     'loadSentencesError': 'Could not load the example sentences.',
@@ -114,7 +124,8 @@ const UI = {
     'keys.esc': 'Skip to the next card (not scored)',
     'keys.hint': 'Hint (press again for more)',
     'keys.answer': 'Show the answer (not scored)',
-    'keys.typed': 'Hint / show the answer while typing in the answer box',
+    'keys.speak': 'Listen: read the Spanish aloud',
+    'keys.typed': 'Hint / show the answer / listen while typing in the answer box',
     'keys.help': 'Show this help',
     'keys.accents': "Type a' e' i' o' u' for á é í ó ú, n~ for ñ and u\" for ü.",
     close: 'Close',
@@ -135,12 +146,15 @@ const UI = {
     'scope.review': 'Mis errores ({n})',
     'scope.cat': 'Repaso: {label}',
     'scope.sentences': 'Verbos en frases reales',
+    'scope.recognize': 'Reconocer verbos conjugados',
+    'scope.listening': 'Escuchar frases reales',
     'scope.idioms': 'Modismos y expresiones',
     'scope.conversation': 'Conversación: todas las situaciones',
     'scope.grammar': 'Gramática: todos los temas',
     'group.verbs': 'Verbos',
     'group.vocab': 'Temas de vocabulario',
     'group.phrases': 'Modismos y conversación',
+    'group.listening': 'Comprensión auditiva',
     'group.grammar': 'Gramática',
     'group.review': 'Repaso',
     'mood.indicative': 'Indicativo',
@@ -187,6 +201,13 @@ const UI = {
     'prompt.idiom.en-es': '¿Qué expresión significa esto?',
     'prompt.conversation': '¿Cuál es la mejor respuesta?',
     'prompt.grammar': '¿Qué palabra completa la frase?',
+    'prompt.recognize': '¿Qué verbo, persona y tiempo es?',
+    'chip.recognize': 'Reconocer',
+    'prompt.listen': '¿Qué significa?',
+    listen: 'Escuchar',
+    listenSlow: 'Más despacio',
+    noVoice: 'Este dispositivo no tiene una voz en español para leer en voz alta.',
+    'table.title': '{inf} en {tense}',
     'credit.sentence': 'Frase {link} de {by}',
     'credit.translation': 'traducción {link} de {by}',
     'loadSentencesError': 'No se pudieron cargar las frases de ejemplo.',
@@ -220,7 +241,8 @@ const UI = {
     'keys.esc': 'Saltar a la siguiente tarjeta (no cuenta)',
     'keys.hint': 'Pista (pulsa otra vez para más)',
     'keys.answer': 'Ver la respuesta (no cuenta)',
-    'keys.typed': 'Pista / ver la respuesta mientras escribes',
+    'keys.speak': 'Escuchar: lee el español en voz alta',
+    'keys.typed': 'Pista / ver la respuesta / escuchar mientras escribes',
     'keys.help': 'Mostrar esta ayuda',
     'keys.accents': 'Escribe a\' e\' i\' o\' u\' para á é í ó ú, n~ para ñ y u" para ü.',
     close: 'Cerrar',
@@ -515,6 +537,15 @@ export function tatoebaCredit(lang, s, { translation = true } = {}) {
 }
 const creditSmall = (lang, n, opts) => `<small class="credit">${tatoebaCredit(lang, n, opts)}</small>`;
 
+/**
+ * One reading of a conjugated form, "tener · nosotros · Preterite", as HTML:
+ * { inf, tense, persons } (persons [null] for the gerund and participle).
+ */
+export function readingHtml(lang, r) {
+  const persons = r.persons[0] === null ? [] : [r.persons.map((p) => esc(personLabel(r.tense, p))).join(lang === 'en' ? ' or ' : ' o ')];
+  return [`<span lang="es">${esc(r.inf)}</span>`, ...persons, esc(tenseName(lang, r.tense))].join(' · ');
+}
+
 // A Tatoeba sentence with its verb in bold.
 const sentenceHtml = (n) =>
   `<span lang="es">${esc(n.es.slice(0, n.blank[0]))}<b>${esc(n.es.slice(n.blank[0], n.blank[1]))}</b>${esc(n.es.slice(n.blank[1]))}</span>`;
@@ -614,10 +645,17 @@ const NOTES = {
     meaning: { explain: (n) => `${b(n.inf)} means “${esc(n.en)}”.` },
     'picked-meaning': { explain: (n) => `You chose: ${b(n.inf)} means “${esc(n.en)}”.`, hint: () => null },
     'meaning-hint': { explain: (n) => `${n.english ? 'In English it' : 'It'} starts with “${esc(n.letter)}”.` },
-    'verb-example': {
+    'in-sentence': {
       explain: (n) => `${sentenceHtml(n)} — “${esc(n.en)}” ${creditSmall('en', n)}`,
       hint: (n) => `Here it is in a sentence: ${sentenceHtml(n)} ${creditSmall('en', n, { translation: false })}`,
     },
+    reading: {
+      explain: (n) => `${b(n.form)} = ${readingHtml('en', n)}. ${b(n.inf)} means “${esc(n.en)}”, so ${b(n.form)} means “${esc(n.english)}”.`,
+    },
+    'picked-reading': { explain: (n) => `You chose ${readingHtml('en', n)}: that would be ${b(n.form)}.`, hint: () => null },
+    'recognize-hint': { explain: (n) => `It's a form of ${b(n.inf)} (“${esc(n.en)}”).` },
+    transcript: { explain: (n) => `It says: <span lang="es">${esc(n.es)}</span>` },
+    'picked-listen': { explain: (n) => `You chose “${esc(n.en)}”, which would be ${b(n.es)}`, hint: () => null },
     'vocab-meaning': { explain: (n) => `${b(n.es)} means “${esc(n.en)}”.` },
     'vocab-regions': { explain: (n) => `Mexico: ${b(n.mx)} · Spain: ${b(n.es)}` },
     'picked-vocab': { explain: (n) => `You chose: ${b(n.es)} means “${esc(n.en)}”.`, hint: () => null },
@@ -740,10 +778,17 @@ const NOTES = {
     meaning: { explain: (n) => `${b(n.inf)} significa “${esc(n.en)}”.` },
     'picked-meaning': { explain: (n) => `Elegiste: ${b(n.inf)} significa “${esc(n.en)}”.`, hint: () => null },
     'meaning-hint': { explain: (n) => `${n.english ? 'En inglés empieza' : 'Empieza'} por “${esc(n.letter)}”.` },
-    'verb-example': {
+    'in-sentence': {
       explain: (n) => `${sentenceHtml(n)} — “${esc(n.en)}” ${creditSmall('es', n)}`,
       hint: (n) => `Así se usa en una frase: ${sentenceHtml(n)} ${creditSmall('es', n, { translation: false })}`,
     },
+    reading: {
+      explain: (n) => `${b(n.form)} = ${readingHtml('es', n)}. ${b(n.inf)} significa “${esc(n.en)}”, así que ${b(n.form)} significa “${esc(n.english)}”.`,
+    },
+    'picked-reading': { explain: (n) => `Elegiste ${readingHtml('es', n)}: sería ${b(n.form)}.`, hint: () => null },
+    'recognize-hint': { explain: (n) => `Es una forma de ${b(n.inf)} (“${esc(n.en)}”).` },
+    transcript: { explain: (n) => `Dice: <span lang="es">${esc(n.es)}</span>` },
+    'picked-listen': { explain: (n) => `Elegiste “${esc(n.en)}”, que sería ${b(n.es)}`, hint: () => null },
     'vocab-meaning': { explain: (n) => `${b(n.es)} significa “${esc(n.en)}”.` },
     'vocab-regions': { explain: (n) => `México: ${b(n.mx)} · España: ${b(n.es)}` },
     'picked-vocab': { explain: (n) => `Elegiste: ${b(n.es)} significa “${esc(n.en)}”.`, hint: () => null },
@@ -811,6 +856,8 @@ const CATEGORIES = {
     irregular: ['Fully irregular forms (ser, ir, haber, dar)', 'Some forms follow no pattern and have to be memorized: soy, fui, voy, he, doy, sé.'],
     vosotros: ['Vosotros forms', 'Spain uses vosotros for "you all" among friends: -áis/-éis/-ís in the present, -steis in the preterite, -d in commands.'],
     meanings: ['Verb meanings', 'Which Spanish verb means what.'],
+    recognize: ['Recognizing conjugated verbs', 'Read the ending first: -mos is nosotros, -ron is ellos in the preterite, -ría the conditional, -ra/-se the imperfect subjunctive. Then find the verb under any stem change (tuv- → tener).'],
+    listening: ['Listening', 'Listen for the verb and its ending first. Play a sentence again, or slower, as often as you need.'],
     regional: ['Mexico ↔ Spain words', 'Everyday words that differ between Mexico and Spain: carro/coche, computadora/ordenador.'],
     idioms: ['Idioms & expressions', 'Idioms rarely mean what their words say. Learn each one with its literal image and an example: meter la pata, literally "to put in the paw", means to put your foot in it.'],
   },
@@ -837,6 +884,8 @@ const CATEGORIES = {
     irregular: ['Formas totalmente irregulares (ser, ir, haber, dar)', 'Algunas formas no siguen ningún patrón y hay que memorizarlas: soy, fui, voy, he, doy, sé.'],
     vosotros: ['Formas de vosotros', 'En España se usa vosotros para "ustedes" en confianza: -áis/-éis/-ís en presente, -steis en pretérito, -d en el imperativo.'],
     meanings: ['Significado de verbos', 'Qué significa cada verbo.'],
+    recognize: ['Reconocer verbos conjugados', 'Mira primero la terminación: -mos es nosotros, -ron es ellos en el pretérito, -ría el condicional, -ra/-se el imperfecto de subjuntivo. Luego busca el verbo bajo el cambio de raíz (tuv- → tener).'],
+    listening: ['Comprensión auditiva', 'Escucha primero el verbo y su terminación. Repite la frase, o escúchala más despacio, las veces que haga falta.'],
     regional: ['Palabras de México ↔ España', 'Palabras cotidianas que cambian entre México y España: carro/coche, computadora/ordenador.'],
     idioms: ['Modismos y expresiones', 'Los modismos casi nunca significan lo que dicen sus palabras. Apréndelos con su imagen literal y un ejemplo: meter la pata es equivocarse.'],
   },
@@ -877,7 +926,8 @@ export function exampleHtml(lang, ex) {
     const person = ex.person === null ? '' : ` · ${esc(personLabel(ex.tense, ex.person))}`;
     return `<span lang="es">${esc(ex.inf)}</span> · ${esc(tenseName(lang, ex.tense))}${person} → ${b(ex.answer)}`;
   }
-  const answerLang = ex.kind === 'meaning' || ex.kind === 'idiom' || (ex.kind === 'vocab' && ex.dir === 'es-en') ? 'en' : 'es';
+  if (ex.kind === 'recognize') return `${b(ex.form)} → ${readingHtml(lang, ex)}`;
+  const answerLang = ['meaning', 'idiom', 'listen'].includes(ex.kind) || (ex.kind === 'vocab' && ex.dir === 'es-en') ? 'en' : 'es';
   return `${esc(ex.prompt)} → <b lang="${answerLang}">${esc(ex.answer)}</b>`;
 }
 

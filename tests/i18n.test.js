@@ -206,7 +206,7 @@ test('Spanish-to-English verb meaning hints show the verb in a real sentence, ne
       assert.notEqual(example.region, 'es', `${verb.inf}: a Spain-only sentence for Mexico`);
     }
     const hints = hintNotes(q, { example });
-    assert.equal(hints[0].key, example ? 'verb-example' : 'meaning-hint');
+    assert.equal(hints[0].key, example ? 'in-sentence' : 'meaning-hint');
     checkRendered(q, hints, 'hint');
     checkRendered(q, explanationNotes(q, { example }), 'explain');
     for (const lang of LANGS) {
