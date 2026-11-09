@@ -78,6 +78,29 @@ test("region settings leave out the other region's phrases", () => {
   }
 });
 
+test('a scope with few cards at the level adds the next levels up, so cards vary', () => {
+  const LEVEL_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+  const seen = (scope, level) => {
+    const keys = new Set();
+    const levels = new Set();
+    for (let seed = 0; seed < 120; seed++) {
+      const q = ask(scope, { level, region: 'mx', seed });
+      keys.add(q.key);
+      levels.add(q.level);
+    }
+    return { keys, top: Math.max(...[...levels].map((l) => LEVEL_ORDER.indexOf(l))) };
+  };
+  // the subjunctive starts at B1: at A2 the B1 cards join in, and no higher
+  const subj = seen('grammar:subjunctive', 'A2');
+  assert.ok(subj.keys.size >= 8, `${subj.keys.size} subjunctive cards at A2`);
+  assert.equal(LEVEL_ORDER[subj.top], 'B1');
+  // every situation has enough cards for a beginner
+  for (const situation of Object.keys(conversation.situations)) {
+    const s = seen(`situation:${situation}`, 'A1');
+    assert.ok(s.keys.size >= 8, `${situation}: ${s.keys.size} cards at A1`);
+  }
+});
+
 test('levels limit phrase questions', () => {
   const rng = seededRng(5);
   for (let i = 0; i < 200; i++) {

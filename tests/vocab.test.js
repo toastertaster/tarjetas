@@ -110,6 +110,14 @@ test('gender comes from the article unless the data overrides it', () => {
   assert.equal(genderOf(item('big'), 'grande'), null);
 });
 
+test('every topic has enough words for a beginner', () => {
+  for (const topic of Object.keys(vocab.topics)) {
+    const ids = new Set();
+    for (let seed = 0; seed < 150; seed++) ids.add(ask({ scope: `topic:${topic}` }, 'A1', seed).item.id);
+    assert.ok(ids.size >= 8, `${topic}: only ${ids.size} words at A1`);
+  }
+});
+
 test('every level has vocabulary to ask', () => {
   for (const level of LEVELS) assert.ok(ask({}, level).item);
 });
