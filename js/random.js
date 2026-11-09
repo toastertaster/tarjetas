@@ -37,15 +37,32 @@ export function shuffle(arr, rng) {
   return a;
 }
 
+// Fewer cards than this and the same few come round again and again.
+export const MIN_POOL = 8;
+
 /**
- * Pick an item for a level: items above the level are skipped (unless
- * nothing else is left), items at the level are favored, and recently asked
- * subjects (`avoid`, matched with `subject`) are skipped when possible.
- * `weight` adds a further preference.
+ * The items a learner at `level` can be asked: those at or below it. When a
+ * scope has only a few there (the subjunctive starts at B1; a topic like
+ * law is mostly B2), the next levels up join until there are MIN_POOL, so
+ * the cards still vary.
+ */
+export function upToLevel(items, level, levelOf = (x) => x.level) {
+  let top = Math.max(lvl(level), 0);
+  let pool = items.filter((x) => lvl(levelOf(x)) <= top);
+  while (pool.length < MIN_POOL && top < LEVELS.length - 1) {
+    top += 1;
+    pool = items.filter((x) => lvl(levelOf(x)) <= top);
+  }
+  return pool;
+}
+
+/**
+ * Pick an item for a level (from upToLevel): items at the level are
+ * favored, and recently asked subjects (`avoid`, matched with `subject`) are
+ * skipped when possible. `weight` adds a further preference.
  */
 export function pickAtLevel(items, { level, levelOf = (x) => x.level, subject = (x) => x.id, avoid = new Set(), weight = () => 1, rng }) {
-  const pool = items.filter((x) => lvl(levelOf(x)) <= lvl(level));
-  const list = pool.length ? pool : items;
+  const list = upToLevel(items, level, levelOf);
   const fresh = list.filter((x) => !avoid.has(subject(x)));
   return weightedPick(fresh.length ? fresh : list, (x) => (levelOf(x) === level ? 3 : 1) * weight(x), rng);
 }
