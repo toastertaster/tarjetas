@@ -121,5 +121,8 @@ test('settings opened on a phone', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'settings are always shown on desktop');
   await openApp(page);
   await showSettings(page);
-  await shot(page, 'settings-open');
+  // Only the header. The card under it is in "conjugation card", and below
+  // the open settings its rows land on fractional pixels that CI machines
+  // round differently, so a whole-page image fails for no visible change.
+  await expect(page.locator('#topbar')).toHaveScreenshot('settings-open.png');
 });
